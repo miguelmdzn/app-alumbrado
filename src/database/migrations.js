@@ -1,0 +1,200 @@
+/**
+ * ============================================================================
+ * DATABASE / MIGRATIONS — Alumbrado Público
+ * ============================================================================
+ * Sistema de migraciones versionadas para SQLite.
+ *
+ * Cómo agregar una nueva tabla al sistema:
+ *   1. Crea una nueva entrada en el array MIGRATIONS con la siguiente versión.
+ *   2. Escribe el SQL de creación de la tabla en `up`.
+ *   3. No modifiques migraciones ya aplicadas — crea una nueva.
+ *   4. La tabla `_schema_migrations` lleva el registro de qué versiones ya corrieron.
+ *
+ * Convención de nombres de tablas:
+ *   - Siempre en snake_case y en español descriptivo.
+ *   - Prefijo por dominio si hay riesgo de colisión (p.ej. "inv_", "mant_").
+ * ============================================================================
+ */
+
+/**
+ * Lista ordenada de migraciones.
+ * Cada entrada tiene:
+ *   version  → número entero único e incremental (nunca reutilizar)
+ *   name     → descripción corta en snake_case (solo para logs)
+ *   up       → SQL a ejecutar (puede ser múltiples sentencias separadas por ";")
+ */
+const MIGRATIONS = [
+  // -------------------------------------------------------------------------
+  // v1 — Estructura base del sistema: metadatos y tabla de control de migraciones
+  // -------------------------------------------------------------------------
+  {
+    version: 1,
+    name: 'create_schema_migrations_and_config',
+    up: `
+      CREATE TABLE IF NOT EXISTS _schema_migrations (
+        version     INTEGER PRIMARY KEY,
+        name        TEXT    NOT NULL,
+        applied_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Configuración general del módulo de Alumbrado Público
+      -- clave / valor genérico para cualquier parámetro del sistema
+      CREATE TABLE IF NOT EXISTS config_bitacora (
+        clave       TEXT PRIMARY KEY,
+        valor       TEXT,
+        updated_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v2 — Tabla de evidencias de bitácora diaria
+  // -------------------------------------------------------------------------
+  {
+    version: 2,
+    name: 'create_evidencias',
+    up: `
+      CREATE TABLE IF NOT EXISTS evidencias (
+        id               TEXT    PRIMARY KEY,
+        folio            TEXT    NOT NULL,
+        solicitante      TEXT,
+        fecha_atencion   TEXT,
+        hora_atencion    TEXT,
+        personal_atendio TEXT,
+        turno            TEXT,
+        ubicacion        TEXT,
+        latitud          REAL,
+        longitud         REAL,
+        altitud          TEXT,
+        enlace_maps      TEXT,
+        observaciones    TEXT,
+        estatus          TEXT    NOT NULL DEFAULT 'Atendido',
+        tipo_reporte     TEXT,
+        foto1            TEXT,
+        foto2            TEXT,
+        created_at       TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_evidencias_fecha
+        ON evidencias (fecha_atencion);
+
+      CREATE INDEX IF NOT EXISTS idx_evidencias_folio
+        ON evidencias (folio);
+
+      CREATE INDEX IF NOT EXISTS idx_evidencias_estatus
+        ON evidencias (estatus);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v3 — Tabla de reportes de fallas y lámparas de Alumbrado Público
+  // -------------------------------------------------------------------------
+  {
+    version: 3,
+    name: 'create_reportes',
+    up: `
+      CREATE TABLE IF NOT EXISTS reportes (
+        id                TEXT PRIMARY KEY,
+        folio             TEXT NOT NULL,
+        fecha             TEXT,
+        atendio           TEXT,
+        usuario           TEXT,
+        direccion         TEXT,
+        colonia_comunidad TEXT,
+        telefono          TEXT,
+        numero_lamparas   INTEGER DEFAULT 1,
+        tipo_lampara      TEXT,
+        tipo_falla        TEXT,
+        observaciones     TEXT,
+        referencias       TEXT,
+        entre_calles      TEXT,
+        estatus           TEXT NOT NULL DEFAULT 'Pendiente',
+        created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_reportes_folio
+        ON reportes (folio);
+
+      CREATE INDEX IF NOT EXISTS idx_reportes_fecha
+        ON reportes (fecha);
+
+      CREATE INDEX IF NOT EXISTS idx_reportes_colonia
+        ON reportes (colonia_comunidad);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // → PLANTILLA para futuras tablas — copiar y ajustar
+  //
+  // {
+  //   version: 3,
+  //   name: 'create_<nombre_tabla>',
+  //   up: `
+  //     CREATE TABLE IF NOT EXISTS <nombre_tabla> (
+  //       id          TEXT PRIMARY KEY,
+  //       ...campos...
+  //       created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  //     );
+  //   `
+  // },
+  // -------------------------------------------------------------------------
+];
+
+/**
+ * Ejecuta todas las migraciones pendientes sobre la conexión dada.
+ * Es seguro llamarlo en cada arranque: salta las versiones ya aplicadas.
+ *
+ * @param {object} conn - Objeto de conexión SQLite del core.
+ */
+export async function runMigrations(conn) {
+  if (!conn) return;
+
+  try {
+    // Asegurar que la tabla de control exista (bootstrap mínimo)
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS _schema_migrations (
+        version     INTEGER PRIMARY KEY,
+        name        TEXT    NOT NULL,
+        applied_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Leer versiones ya aplicadas
+    const applied = await conn.select(
+      'SELECT version FROM _schema_migrations ORDER BY version ASC;'
+    );
+    const appliedVersions = new Set((applied || []).map((r) => r.version));
+
+    // Correr sólo las pendientes, en orden
+    for (const migration of MIGRATIONS) {
+      if (appliedVersions.has(migration.version)) continue;
+
+      console.info(`[Migrations] Aplicando v${migration.version}: ${migration.name}`);
+
+      // Ejecutar cada sentencia individualmente (plugin-sql no soporta multi-statement nativo)
+      const statements = migration.up
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
+      for (const stmt of statements) {
+        await conn.execute(stmt + ';');
+      }
+
+      // Registrar como aplicada
+      await conn.execute(
+        'INSERT INTO _schema_migrations (version, name) VALUES ($1, $2);',
+        [migration.version, migration.name]
+      );
+
+      console.info(`[Migrations] v${migration.version} completada.`);
+    }
+
+    console.info('[Migrations] Esquema actualizado correctamente.');
+  } catch (err) {
+    console.error('[Migrations] Error al correr migraciones:', err);
+  }
+}
+

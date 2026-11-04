@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro de Evidencias - Alumbrado Público</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="qrcode.min.js"></script>
+  <script type="module" src="registros.js" defer></script>
+</head>
+
+<body>
+
+  <main class="app-container">
+
+    <!-- ====================================================================
+         VISTA DE PANTALLA: TABLA DE REGISTROS (Se oculta al imprimir PDF)
+         ==================================================================== -->
+    <div class="noprint">
+
+      <!-- Barra superior de navegación y exportación -->
+      <header class="app-top-nav">
+        <div class="nav-title-group">
+          <h1 class="app-title">Registro de Evidencias</h1>
+          <p class="app-desc">Consulta de reportes guardados en la base de datos de Alumbrado Público.</p>
+        </div>
+
+        <div class="nav-actions">
+          <a href="index.html" class="btn btn-secondary btn-nav-link" id="btnBackToForm">
+            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            Capturar Evidencia
+          </a>
+
+          <a href="reportes.html" class="btn btn-secondary btn-nav-link" id="btnGoToReportes">
+            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="12" y1="18" x2="12" y2="12"></line>
+              <line x1="9" y1="15" x2="15" y2="15"></line>
+            </svg>
+            Nuevo Reporte de Falla
+          </a>
+
+          <button type="button" class="btn btn-secondary btn-nav-link" id="btnOpenFolder" title="Abrir carpeta de fotos en el explorador de archivos">
+            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Carpeta de fotos
+          </button>
+
+          <button type="button" class="btn btn-primary btn-nav-link" id="btnExportPdf">
+            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Exportar / Imprimir PDF
+          </button>
+        </div>
+      </header>
+
+      <!-- Tarjeta principal con barra de búsqueda y Tabla de Registros -->
+      <section class="records-container-card">
+        <div class="records-toolbar">
+          <div class="records-search-wrapper">
+            <input type="search" id="searchInput" placeholder="Buscar por folio, tipo o domicilio..." class="field-input">
+          </div>
+
+          <div class="records-stats-summary">
+            <div class="stat-pill">Total: <strong id="lblTotal">0</strong></div>
+            <div class="stat-pill">Atendidos: <strong id="lblAtendidos">0</strong></div>
+            <div class="stat-pill">Pendientes: <strong id="lblPendientes">0</strong></div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="records-table">
+            <thead>
+              <tr>
+                <th>Fecha y Hora</th>
+                <th>Folio</th>
+                <th>Domicilio</th>
+                <th>Tipo de reporte</th>
+                <th>Latitud</th>
+                <th>Altitud</th>
+                <th class="td-center">Maps</th>
+                <th class="td-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTableBody">
+              <!-- Renglones generados dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ====================================================================
+         VISTA DE IMPRESIÓN OFICIAL: BITÁCORA PDF (Idéntica a Image 2)
+         Solo visible al exportar o imprimir con window.print()
+         ==================================================================== -->
+    <section id="printDocument" class="print-only">
+
+      <!-- Encabezado oficial -->
+      <header class="doc-header" id="docHeader">
+        <div class="doc-topbar">
+          <span class="doc-topbar-title">BITÁCORA DIARIA DE REPORTES | <span id="topAreaText">ALUMBRADO PÚBLICO</span></span>
+          <span class="doc-topbar-date">Fecha: <span id="topDateText">--/--/----</span></span>
+        </div>
+        <div class="doc-main-titles">
+          <h1 class="doc-title">BITÁCORA DIARIA DE REPORTES</h1>
+          <div class="doc-subtitle" id="docSubtitle">Alumbrado Público · Fecha: —</div>
+        </div>
+      </header>
+
+      <!-- KPIs oficiales -->
+      <section class="kpi-banner" id="kpiBanner">
+        <div class="kpi-column">
+          <span class="kpi-number" id="kR">0</span>
+          <span class="kpi-label">Reportes Recibidos</span>
+        </div>
+        <div class="kpi-column">
+          <span class="kpi-number" id="kA">0</span>
+          <span class="kpi-label">Atendidos</span>
+        </div>
+        <div class="kpi-column">
+          <span class="kpi-number" id="kP">0</span>
+          <span class="kpi-label">Pendientes</span>
+        </div>
+      </section>
+
+      <!-- Tarjetas de evidencia con QR debajo de coordenadas y fotos lado a lado -->
+      <div class="reports-container" id="list"></div>
+
+      <!-- Firmas oficiales al pie -->
+      <footer class="doc-signatures">
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          <span class="signature-title">ELABORÓ</span>
+          <span class="signature-name" id="fElab">—</span>
+        </div>
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          <span class="signature-title">REVISÓ / VO. BO.</span>
+          <span class="signature-name" id="fReviso">—</span>
+        </div>
+      </footer>
+
+    </section>
+
+  </main>
+
+</body>
+
+</html>
+

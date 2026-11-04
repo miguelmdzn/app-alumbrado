@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nuevo Reporte de Falla - Alumbrado Público</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="reportes.js" defer></script>
+</head>
+
+<body>
+
+  <!-- Notificación Toast flotante -->
+  <div id="toastNotification" class="toast-notification hidden" role="alert">
+    <div class="toast-icon" id="toastIcon"></div>
+    <span class="toast-message" id="toastMessage"></span>
+    <button type="button" class="toast-close" id="toastClose" aria-label="Cerrar">&times;</button>
+  </div>
+
+  <main class="app-container">
+
+    <!-- Encabezado con navegación general -->
+    <header class="app-top-nav">
+      <div class="nav-title-group">
+        <h1 class="app-title">Reportes de Alumbrado Público</h1>
+        <p class="app-desc">Registro y seguimiento de reportes ciudadanos y fallas en lámparas.</p>
+      </div>
+
+      <div class="nav-actions">
+        <a href="registros-reportes.html" class="btn btn-secondary btn-nav-link" id="btnGoToRegistrosReportes">
+          <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          Ver Registro de Reportes
+        </a>
+
+        <a href="index.html" class="btn btn-secondary btn-nav-link" id="btnGoToBitacora">
+          <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          Bitácora de Evidencias
+        </a>
+      </div>
+    </header>
+
+    <!-- Panel del Formulario de Nuevo Reporte -->
+    <form class="panel form-report" id="reporteForm" autocomplete="off">
+      <div class="panel-header">
+        <h2 class="panel-title" id="reporteFormTitle">Nuevo Reporte de Falla / Lámpara</h2>
+      </div>
+
+      <div class="form-grid">
+        <!-- Fila 1 -->
+        <label class="field col-1">
+          <span class="field-label">Folio <span class="required">*</span></span>
+          <input type="text" id="folio" required placeholder="Ej. REP-2026-001" class="field-input">
+        </label>
+
+        <label class="field col-1">
+          <span class="field-label">Fecha</span>
+          <input type="date" id="fecha" class="field-input">
+        </label>
+
+        <label class="field col-1">
+          <span class="field-label">Nombre del que atiende</span>
+          <input type="text" id="atendio" placeholder="Ej. Juan Pérez" class="field-input">
+        </label>
+
+        <label class="field col-1">
+          <span class="field-label">Teléfono de contacto</span>
+          <input type="tel" id="telefono" placeholder="Ej. 464 123 4567" class="field-input">
+        </label>
+
+        <!-- Fila 2 -->
+        <label class="field col-2">
+          <span class="field-label">Usuario (Solicitante)</span>
+          <input type="text" id="usuario" placeholder="Ej. María López Hernández" class="field-input">
+        </label>
+
+        <label class="field col-1">
+          <span class="field-label">Dirección (Calle y número)</span>
+          <input type="text" id="direccion" placeholder="Ej. Calle Morelos #120" class="field-input">
+        </label>
+
+        <label class="field col-1">
+          <span class="field-label">Colonia o comunidad</span>
+          <input type="text" id="colonia" placeholder="Ej. Col. Bellavista" class="field-input">
+        </label>
+
+        <!-- Fila 3 -->
+        <label class="field col-1">
+          <span class="field-label">Número de lámparas</span>
+          <input type="number" id="numeroLamparas" min="1" value="1" class="field-input">
+        </label>
+
+        <!-- Tipo de lámpara con activación de "Otro" -->
+        <label class="field col-1" id="fieldTipoLampara">
+          <span class="field-label">Tipo de lámpara</span>
+          <select id="tipoLampara" class="field-select">
+            <option value="Blanca">Blanca</option>
+            <option value="Amarilla">Amarilla</option>
+            <option value="Led">Led</option>
+            <option value="Reflector">Reflector</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </label>
+
+        <label class="field col-2 hidden" id="wrapOtroLampara">
+          <span class="field-label">Especificar tipo de lámpara <span class="required">*</span></span>
+          <input type="text" id="otroLampara" placeholder="Ej. Solar, Suburbana, etc." class="field-input">
+        </label>
+
+        <!-- Tipo de falla con activación de "Otro" -->
+        <label class="field col-1" id="fieldTipoFalla">
+          <span class="field-label">Tipo de falla</span>
+          <select id="tipoFalla" class="field-select">
+            <option value="No prende">No prende</option>
+            <option value="Prende y apaga">Prende y apaga</option>
+            <option value="Circuito apagado">Circuito apagado</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </label>
+
+        <label class="field col-2 hidden" id="wrapOtroFalla">
+          <span class="field-label">Especificar tipo de falla <span class="required">*</span></span>
+          <input type="text" id="otroFalla" placeholder="Ej. Cable caído, balastro quemado, etc." class="field-input">
+        </label>
+
+        <!-- Fila 4: Calles y Referencias -->
+        <label class="field col-2">
+          <span class="field-label">Entre qué calles se encuentra la lámpara</span>
+          <input type="text" id="entreCalles" placeholder="Ej. Entre Zaragoza y 5 de Mayo" class="field-input">
+        </label>
+
+        <label class="field col-2">
+          <span class="field-label">Referencias para encontrar la lámpara</span>
+          <input type="text" id="referencias" placeholder="Ej. Frente a la tienda de abarrotes, poste verde" class="field-input">
+        </label>
+
+        <!-- Fila 5: Observaciones -->
+        <label class="field col-4">
+          <span class="field-label">Observaciones</span>
+          <textarea id="observaciones" rows="3" placeholder="Información adicional, detalles o notas de seguimiento..." class="field-textarea"></textarea>
+        </label>
+      </div>
+
+      <!-- Barra de acciones del formulario -->
+      <div class="form-actions-bar">
+        <button type="submit" class="btn btn-primary" id="btnSaveReporte">Guardar reporte</button>
+        <button type="button" class="btn btn-secondary" id="btnResetReporte">Limpiar campos</button>
+        <a href="registros-reportes.html" class="btn btn-secondary" id="btnGoToRegistrosReportes">
+          <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          Ver Registro de Reportes
+        </a>
+      </div>
+    </form>
+
+  </main>
+
+</body>
+
+</html>
+

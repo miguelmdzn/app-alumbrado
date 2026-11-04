@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro de Reportes - Alumbrado Público</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="registros-reportes.js" defer></script>
+</head>
+
+<body>
+
+  <main class="app-container">
+
+    <!-- ====================================================================
+         VISTA DE PANTALLA: TABLA (Se oculta al imprimir)
+         ==================================================================== -->
+    <div class="noprint">
+
+      <!-- Barra superior de navegación y exportación -->
+      <header class="app-top-nav">
+        <div class="nav-title-group">
+          <h1 class="app-title">Registro de Reportes de Fallas</h1>
+          <p class="app-desc">Consulta e impresión de reportes ciudadanos de Alumbrado Público.</p>
+        </div>
+
+        <div class="nav-actions">
+          <a href="reportes.html" class="btn btn-secondary btn-nav-link" id="btnBackToForm">
+            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Capturar nuevo reporte
+          </a>
+
+          <a href="index.html" class="btn btn-secondary btn-nav-link" id="btnGoToBitacora">
+            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+            Bitácora de Evidencias
+          </a>
+
+          <button type="button" class="btn btn-primary btn-nav-link" id="btnExportPdf">
+            <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Exportar / Imprimir PDF
+          </button>
+        </div>
+      </header>
+
+      <!-- Tarjeta con búsqueda y tabla de registros -->
+      <section class="records-container-card">
+        <div class="records-toolbar">
+          <div class="records-search-wrapper">
+            <input type="search" id="searchInput" placeholder="Buscar por folio, usuario, colonia, tipo de falla..." class="field-input">
+          </div>
+
+          <div class="records-stats-summary">
+            <div class="stat-pill">Total: <strong id="lblTotal">0</strong></div>
+            <div class="stat-pill">Lámparas: <strong id="lblLamparas">0</strong></div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="records-table">
+            <thead>
+              <tr>
+                <th>Folio</th>
+                <th>Fecha</th>
+                <th>Atendió</th>
+                <th>Usuario / Solicitante</th>
+                <th>Ubicación</th>
+                <th>Colonia</th>
+                <th>Teléfono</th>
+                <th>Lámparas</th>
+                <th>Tipo Lámpara</th>
+                <th>Tipo de Falla</th>
+                <th class="td-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="reportesTableBody">
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ====================================================================
+         VISTA DE IMPRESIÓN: DOCUMENTO OFICIAL (Solo visible al imprimir)
+         Muestra TODA la información del reporte en fichas bien estructuradas
+         ==================================================================== -->
+    <section id="printDocument" class="print-only">
+
+      <!-- Encabezado institucional -->
+      <header class="doc-header" id="docHeader">
+        <div class="doc-topbar">
+          <span class="doc-topbar-title">ALUMBRADO PÚBLICO | REPORTES DE FALLAS</span>
+          <span class="doc-topbar-date">Fecha de impresión: <span id="printDate"></span></span>
+        </div>
+        <div class="doc-main-titles">
+          <h1 class="doc-title">REGISTRO DE REPORTES DE FALLAS</h1>
+          <div class="doc-subtitle">Alumbrado Público · Municipio de Pénjamo</div>
+        </div>
+      </header>
+
+      <!-- KPIs resumen -->
+      <section class="kpi-banner" id="kpiBanner">
+        <div class="kpi-column">
+          <span class="kpi-number" id="kTotal">0</span>
+          <span class="kpi-label">Total de Reportes</span>
+        </div>
+        <div class="kpi-column">
+          <span class="kpi-number" id="kLamparas">0</span>
+          <span class="kpi-label">Lámparas Reportadas</span>
+        </div>
+        <div class="kpi-column">
+          <span class="kpi-number" id="kFechaRango">—</span>
+          <span class="kpi-label">Período</span>
+        </div>
+      </section>
+
+      <!-- Fichas individuales por reporte -->
+      <div class="reports-container" id="reportesPrintList"></div>
+
+    </section>
+
+  </main>
+
+</body>
+
+</html>
+
