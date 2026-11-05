@@ -105,8 +105,14 @@
           <!-- Tarjeta con búsqueda y tabla de registros -->
           <section class="records-container-card">
             <div class="records-toolbar">
-              <div class="records-search-wrapper">
-                <input type="search" id="searchInput" placeholder="Buscar por folio, usuario, colonia, tipo de falla..." class="field-input">
+              <div class="records-toolbar-left">
+                <div class="records-search-wrapper">
+                  <input type="search" id="searchInput" placeholder="Buscar por folio, usuario, colonia, tipo de falla..." class="field-input">
+                </div>
+                <select id="filterEstatus" class="field-select records-status-select" aria-label="Mostrar reportes por estatus">
+                  <option value="pendiente" selected>Pendientes</option>
+                  <option value="atendido">Atendidos</option>
+                </select>
               </div>
 
               <div class="records-stats-summary">
@@ -129,6 +135,7 @@
                     <th>Lámparas</th>
                     <th>Tipo Lámpara</th>
                     <th>Tipo de Falla</th>
+                    <th>Status</th>
                     <th class="td-center">Acciones</th>
                   </tr>
                 </thead>
@@ -168,6 +175,17 @@
       </main>
     </div>
 
+  </div>
+
+  <div id="modalAtendido" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalAtendidoTitle">
+    <div class="modal-card">
+      <h2 class="modal-title" id="modalAtendidoTitle">Confirmar atención</h2>
+      <p class="modal-text">El reporte se marcara como atendido</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="modalAtendidoNo">No</button>
+        <button type="button" class="btn btn-primary" id="modalAtendidoSi">Sí</button>
+      </div>
+    </div>
   </div>
 
 </body>

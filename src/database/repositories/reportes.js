@@ -21,6 +21,12 @@ const TABLE = 'reportes';
 // ---------------------------------------------------------------------------
 // Mapper: Normalización de datos para la base de datos
 // ---------------------------------------------------------------------------
+function normalizeEstatus(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === 'atendido' || v === 'atendida') return 'atendido';
+  return 'pendiente';
+}
+
 function toRecord(data, uuid) {
   return {
     id:                uuid,
@@ -37,7 +43,7 @@ function toRecord(data, uuid) {
     observaciones:     (data.observaciones || '').trim(),
     referencias:       (data.referencias || '').trim(),
     entre_calles:      (data.entre_calles || data.entreCalles || '').trim(),
-    estatus:           (data.estatus || 'Pendiente').trim(),
+    estatus:           normalizeEstatus(data.estatus),
   };
 }
 

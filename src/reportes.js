@@ -6,16 +6,15 @@
  * - Normalización automática (Mayúsculas, sin espacios al inicio/final, un solo espacio entre palabras)
  * - Activación dinámica de campos adicionales para "Otro"
  * - Guardado en la base de datos (SQLite / IndexedDB) con formato "OTRO (especificación)"
+ * - Alta con estatus "pendiente" y edición de un reporte existente
  * - Notificaciones Toast de confirmación
- * - Tabla interactiva con búsqueda en tiempo real
  * ============================================================================
  */
 
 import {
   initDatabase,
   saveReporte,
-  getAllReportes,
-  deleteReporte,
+  getReporteById,
 } from './db.js';
 
 import {
@@ -25,24 +24,15 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-const esc = (s) =>
-  String(s ?? '').replace(/[&<>"]/g, (c) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;'
-  }[c]));
-
-const fd = (s) => (s ? s.split('-').reverse().join('/') : '');
-
 const today = () => {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 10);
 };
 
-let allReportes = [];
 let toastTimeout = null;
+let editingId = null;
+let editingEstatus = 'pendiente';
 
 /* --------------------------------------------------------------------------
    Notificaciones Toast
@@ -122,9 +112,106 @@ function setupConditionalFields() {
 /* --------------------------------------------------------------------------
    Gestión del Formulario (Guardar, Limpiar)
    -------------------------------------------------------------------------- */
+function setEditMode(active) {
+  const title = $('reporteFormTitle');
+  const pageTitle = document.querySelector('.app-title');
+  const btn = $('btnSaveReporte');
+
+  if (active) {
+    if (title) title.textContent = 'Editar reporte';
+    if (pageTitle) pageTitle.textContent = 'Editar reporte';
+    if (btn) btn.textContent = 'Guardar cambios';
+    document.title = 'Editar reporte - Alumbrado Público';
+    return;
+  }
+
+  editingId = null;
+  editingEstatus = 'pendiente';
+  if (title) title.textContent = 'Nuevo Reporte de Falla / Lámpara';
+  if (pageTitle) pageTitle.textContent = 'Nuevo Reporte de Falla';
+  if (btn) btn.textContent = 'Guardar reporte';
+  document.title = 'Nuevo Reporte de Falla - Alumbrado Público';
+}
+
+function applySelectValue(selectEl, storedValue, wrapEl, otherInput) {
+  const raw = String(storedValue || '').trim();
+  const otro = raw.match(/^OTRO\s*\((.*)\)\s*$/i);
+
+  if (otro) {
+    selectEl.value = 'Otro';
+    wrapEl?.classList.remove('hidden');
+    if (otherInput) otherInput.value = otro[1].trim();
+    return;
+  }
+
+  const match = [...selectEl.options].find(
+    (opt) => opt.value.toUpperCase() === raw.toUpperCase()
+  );
+
+  if (match) {
+    selectEl.value = match.value;
+    wrapEl?.classList.add('hidden');
+    if (otherInput) otherInput.value = '';
+    return;
+  }
+
+  if (raw) {
+    selectEl.value = 'Otro';
+    wrapEl?.classList.remove('hidden');
+    if (otherInput) otherInput.value = raw;
+    return;
+  }
+
+  selectEl.selectedIndex = 0;
+  wrapEl?.classList.add('hidden');
+  if (otherInput) otherInput.value = '';
+}
+
+function fillForm(reporte) {
+  $('folio').value = reporte.folio || '';
+  $('fecha').value = reporte.fecha || today();
+  $('atendio').value = reporte.atendio || '';
+  $('telefono').value = reporte.telefono || '';
+  $('usuario').value = reporte.usuario || '';
+  $('direccion').value = reporte.direccion || '';
+  $('colonia').value = reporte.colonia_comunidad || '';
+  $('numeroLamparas').value = String(reporte.numero_lamparas || 1);
+  $('entreCalles').value = reporte.entre_calles || '';
+  $('referencias').value = reporte.referencias || '';
+  $('observaciones').value = reporte.observaciones || '';
+
+  applySelectValue($('tipoLampara'), reporte.tipo_lampara, $('wrapOtroLampara'), $('otroLampara'));
+  applySelectValue($('tipoFalla'), reporte.tipo_falla, $('wrapOtroFalla'), $('otroFalla'));
+}
+
+async function loadReporteForEdit(id) {
+  try {
+    const reporte = await getReporteById(id);
+    if (!reporte) {
+      showToast('error', 'No se encontró el reporte a editar.');
+      return;
+    }
+
+    editingId = reporte.id;
+    editingEstatus = reporte.estatus || 'pendiente';
+    fillForm(reporte);
+    setEditMode(true);
+    $('folio')?.focus();
+  } catch (err) {
+    console.error('Error al cargar reporte para edición:', err);
+    showToast('error', 'No se pudo abrir el reporte para editar.');
+  }
+}
+
 function resetForm() {
   const form = $('reporteForm');
   if (!form) return;
+
+  if (editingId) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('id');
+    history.replaceState({}, '', `${url.pathname}${url.search}`);
+  }
 
   form.reset();
   $('fecha').value = today();
@@ -132,6 +219,7 @@ function resetForm() {
 
   $('wrapOtroLampara')?.classList.add('hidden');
   $('wrapOtroFalla')?.classList.add('hidden');
+  setEditMode(false);
 
   $('folio').focus();
 }
@@ -178,7 +266,6 @@ $('reporteForm')?.addEventListener('submit', async (e) => {
     finalTipoFalla = selFalla.toUpperCase();
   }
 
-  // Construir objeto normalizado
   const reportData = {
     folio:             folioVal,
     fecha:             $('fecha').value || today(),
@@ -193,111 +280,20 @@ $('reporteForm')?.addEventListener('submit', async (e) => {
     entre_calles:      normalizeFinal($('entreCalles').value),
     referencias:       normalizeFinal($('referencias').value),
     observaciones:     normalizeFinal($('observaciones').value),
-    estatus:           'PENDIENTE'
+    estatus:           editingId ? editingEstatus : 'pendiente'
   };
+
+  if (editingId) reportData.id = editingId;
 
   try {
     await saveReporte(reportData);
-    showToast('success', 'Reporte guardado correctamente');
+    showToast('success', editingId ? 'Reporte actualizado correctamente' : 'Reporte guardado correctamente');
     resetForm();
   } catch (err) {
     console.error('Error al guardar reporte:', err);
     showToast('error', 'Ocurrió un error al guardar el reporte');
   }
 });
-
-/* --------------------------------------------------------------------------
-   Renderizado de la Tabla de Reportes
-   -------------------------------------------------------------------------- */
-function renderTable(reportes) {
-  const tbody = $('reportesTableBody');
-  if (!tbody) return;
-
-  if (reportes.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="10" class="table-empty-row">
-          No se encontraron reportes registrados en la base de datos.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  tbody.innerHTML = reportes.map((r) => {
-    const fechaFmt = fd(r.fecha) || '—';
-    const ubicacion = [r.direccion, r.colonia_comunidad].filter(Boolean).join(', ') || '—';
-
-    return `
-      <tr data-report-id="${r.id}">
-        <td class="td-folio">${esc(r.folio || 'S/F')}</td>
-        <td class="td-datetime">${fechaFmt}</td>
-        <td>${esc(r.atendio || '—')}</td>
-        <td><strong>${esc(r.usuario || '—')}</strong></td>
-        <td class="td-domicilio">${esc(ubicacion)}</td>
-        <td class="td-center"><strong>${r.numero_lamparas || 1}</strong></td>
-        <td><span class="badge-lampara">${esc(r.tipo_lampara || '—')}</span></td>
-        <td><span class="badge-falla">${esc(r.tipo_falla || '—')}</span></td>
-        <td>${esc(r.telefono || '—')}</td>
-        <td class="td-center">
-          <button type="button" class="btn btn-danger-outline btn-table-action" data-del="${r.id}" title="Eliminar reporte">
-            Eliminar
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-
-  // Eventos de eliminación
-  tbody.querySelectorAll('[data-del]').forEach((btn) => {
-    btn.onclick = async () => {
-      const id = btn.dataset.del;
-      if (confirm('¿Deseas eliminar este reporte del sistema?')) {
-        await deleteReporte(id);
-        allReportes = allReportes.filter((x) => x.id !== id);
-        applyFilterAndRender();
-        showToast('success', 'Reporte eliminado correctamente');
-      }
-    };
-  });
-}
-
-function updateStats(reportes) {
-  const total = reportes.length;
-  const totalLamparas = reportes.reduce((acc, r) => acc + (parseInt(r.numero_lamparas, 10) || 1), 0);
-
-  if ($('lblTotalReportes')) $('lblTotalReportes').textContent = total;
-  if ($('lblTotalLamparas')) $('lblTotalLamparas').textContent = totalLamparas;
-}
-
-function applyFilterAndRender() {
-  const query = ($('searchReportesInput')?.value || '').trim().toLowerCase();
-
-  let filtered = [...allReportes];
-  if (query) {
-    filtered = filtered.filter((r) => {
-      const folio = (r.folio || '').toLowerCase();
-      const usuario = (r.usuario || '').toLowerCase();
-      const atendio = (r.atendio || '').toLowerCase();
-      const colonia = (r.colonia_comunidad || '').toLowerCase();
-      const direccion = (r.direccion || '').toLowerCase();
-      const falla = (r.tipo_falla || '').toLowerCase();
-      const lampara = (r.tipo_lampara || '').toLowerCase();
-      return (
-        folio.includes(query) ||
-        usuario.includes(query) ||
-        atendio.includes(query) ||
-        colonia.includes(query) ||
-        direccion.includes(query) ||
-        falla.includes(query) ||
-        lampara.includes(query)
-      );
-    });
-  }
-
-  renderTable(filtered);
-  updateStats(filtered);
-}
 
 /* --------------------------------------------------------------------------
    Inicialización
@@ -309,26 +305,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('Error al conectar base de datos:', err);
   }
 
-  // Configurar campos condicionales "Otro"
   setupConditionalFields();
-
-  // Activar normalización universal de texto (mayúsculas, sin espacios al inicio/final, un solo espacio intermedio)
   attachInputNormalizers(document);
 
-  // Fecha de hoy por defecto
   if ($('fecha')) $('fecha').value = today();
 
-  // Cargar reportes existentes
-  try {
-    allReportes = await getAllReportes();
-  } catch (err) {
-    console.error('Error al cargar reportes:', err);
-    allReportes = [];
+  const editId = new URLSearchParams(window.location.search).get('id');
+  if (editId) {
+    await loadReporteForEdit(editId);
   }
-
-  applyFilterAndRender();
-
-  // Búsqueda en vivo
-  $('searchReportesInput')?.addEventListener('input', applyFilterAndRender);
 });
 

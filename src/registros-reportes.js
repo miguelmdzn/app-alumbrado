@@ -12,7 +12,7 @@
 import {
   initDatabase,
   getAllReportes,
-  deleteReporte,
+  saveReporte,
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
@@ -30,6 +30,40 @@ const esc = (s) =>
 const fd = (s) => (s ? s.split('-').reverse().join('/') : '');
 
 let allReportes = [];
+let pendingAttendId = null;
+
+const PENCIL_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 20h9"></path>
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+  </svg>
+`;
+
+const CHECK_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
+`;
+
+function estatusKey(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === 'atendido' || v === 'atendida') return 'atendido';
+  return 'pendiente';
+}
+
+function estatusLabel(value) {
+  return estatusKey(value) === 'atendido' ? 'Atendido' : 'Pendiente';
+}
+
+function openAttendModal(id) {
+  pendingAttendId = id;
+  $('modalAtendido')?.classList.remove('hidden');
+}
+
+function closeAttendModal() {
+  pendingAttendId = null;
+  $('modalAtendido')?.classList.add('hidden');
+}
 
 /* --------------------------------------------------------------------------
    VISTA DE PANTALLA: Tabla interactiva de registros
@@ -38,11 +72,19 @@ function renderTable(reportes) {
   const tbody = $('reportesTableBody');
   if (!tbody) return;
 
+  const filtro = $('filterEstatus')?.value || 'pendiente';
+
   if (reportes.length === 0) {
+    const hasQuery = ($('searchInput')?.value || '').trim();
+    const emptyText = hasQuery
+      ? 'No se encontraron reportes con esa búsqueda.'
+      : filtro === 'atendido'
+        ? 'No se encontraron reportes atendidos.'
+        : 'No se encontraron reportes pendientes.';
     tbody.innerHTML = `
       <tr>
-        <td colspan="11" class="table-empty-row">
-          No se encontraron reportes registrados.
+        <td colspan="12" class="table-empty-row">
+          ${emptyText}
         </td>
       </tr>
     `;
@@ -53,6 +95,10 @@ function renderTable(reportes) {
     const ubicacion = r.direccion || '—';
     const colonia = r.colonia_comunidad || '—';
     const fechaFmt = fd(r.fecha) || '—';
+    const status = estatusKey(r.estatus);
+    const checkBtn = status === 'pendiente'
+      ? `<button type="button" class="btn-icon-action btn-icon-action-check" data-atender="${esc(r.id)}" title="Marcar como atendido" aria-label="Marcar como atendido">${CHECK_ICON}</button>`
+      : '';
 
     return `
       <tr>
@@ -66,23 +112,19 @@ function renderTable(reportes) {
         <td class="td-center"><strong>${r.numero_lamparas || 1}</strong></td>
         <td><span class="badge-lampara">${esc(r.tipo_lampara || '—')}</span></td>
         <td><span class="badge-falla">${esc(r.tipo_falla || '—')}</span></td>
+        <td><span class="badge-status badge-status-${status}">${estatusLabel(r.estatus)}</span></td>
         <td class="td-center">
-          <button type="button" class="btn btn-danger-outline btn-table-action" data-del="${r.id}">
-            Eliminar
-          </button>
+          <div class="table-actions">
+            <a class="btn-icon-action" href="reportes.html?id=${encodeURIComponent(r.id)}" title="Editar reporte" aria-label="Editar reporte">${PENCIL_ICON}</a>
+            ${checkBtn}
+          </div>
         </td>
       </tr>
     `;
   }).join('');
 
-  tbody.querySelectorAll('[data-del]').forEach((btn) => {
-    btn.onclick = async () => {
-      if (confirm('¿Deseas eliminar este reporte?')) {
-        await deleteReporte(btn.dataset.del);
-        allReportes = allReportes.filter((x) => x.id !== btn.dataset.del);
-        applyFilterAndRender();
-      }
-    };
+  tbody.querySelectorAll('[data-atender]').forEach((btn) => {
+    btn.onclick = () => openAttendModal(btn.dataset.atender);
   });
 }
 
@@ -242,12 +284,17 @@ function renderPrintDocument(reportes) {
 
   let sectionsHtml = '';
 
-  // 1. Sección: PENDIENTES DE DÍAS ANTERIORES
+  const viendoAtendidos = ($('filterEstatus')?.value || 'pendiente') === 'atendido';
+  const tituloAnteriores = viendoAtendidos
+    ? `ATENDIDOS DE DÍAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'reporte' : 'reportes'}, del más antiguo al más reciente)`
+    : `PENDIENTES DE DÍAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'reporte' : 'reportes'}, del más antiguo al más reciente) - ATENCIÓN PRIORITARIA`;
+
+  // 1. Sección: días anteriores
   if (anteriores.length > 0) {
     sectionsHtml += `
       <div class="print-section print-section-anteriores">
         <div class="print-section-header-dark">
-          PENDIENTES DE DÍAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'reporte' : 'reportes'}, del más antiguo al más reciente) - ATENCIÓN PRIORITARIA
+          ${tituloAnteriores}
         </div>
         <table class="print-reports-table">
           ${theadHtml}
@@ -287,8 +334,9 @@ function renderPrintDocument(reportes) {
    -------------------------------------------------------------------------- */
 function applyFilterAndRender() {
   const query = ($('searchInput')?.value || '').trim().toLowerCase();
+  const filtro = $('filterEstatus')?.value || 'pendiente';
 
-  let filtered = [...allReportes];
+  let filtered = allReportes.filter((r) => estatusKey(r.estatus) === filtro);
   if (query) {
     filtered = filtered.filter((r) => {
       return [
@@ -301,6 +349,24 @@ function applyFilterAndRender() {
 
   renderTable(filtered);
   renderPrintDocument(filtered);
+}
+
+async function confirmMarcarAtendido() {
+  const id = pendingAttendId;
+  if (!id) return;
+
+  const reporte = allReportes.find((r) => r.id === id);
+  closeAttendModal();
+  if (!reporte) return;
+
+  try {
+    const saved = await saveReporte({ ...reporte, estatus: 'atendido' });
+    const index = allReportes.findIndex((r) => r.id === id);
+    if (index >= 0) allReportes[index] = { ...allReportes[index], ...saved, estatus: 'atendido' };
+    applyFilterAndRender();
+  } catch (err) {
+    console.error('Error al marcar reporte como atendido:', err);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -330,10 +396,20 @@ window.addEventListener('DOMContentLoaded', async () => {
   applyFilterAndRender();
   attachInputNormalizers(document);
 
-  // Búsqueda en vivo
   $('searchInput')?.addEventListener('input', applyFilterAndRender);
+  $('filterEstatus')?.addEventListener('change', applyFilterAndRender);
 
-  // Exportar / Imprimir PDF
+  $('modalAtendidoNo')?.addEventListener('click', closeAttendModal);
+  $('modalAtendidoSi')?.addEventListener('click', confirmMarcarAtendido);
+  $('modalAtendido')?.addEventListener('click', (e) => {
+    if (e.target === $('modalAtendido')) closeAttendModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('modalAtendido')?.classList.contains('hidden')) {
+      closeAttendModal();
+    }
+  });
+
   $('btnExportPdf')?.addEventListener('click', () => {
     window.print();
   });
