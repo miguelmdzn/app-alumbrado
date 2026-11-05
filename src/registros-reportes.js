@@ -3,7 +3,9 @@
  * REGISTRO DE REPORTES DE FALLAS — Alumbrado Público (registros-reportes.js)
  * ============================================================================
  * - Vista en pantalla: tabla interactiva con búsqueda en tiempo real
- * - Vista de impresión: fichas completas con TODA la información del reporte
+ * - Vista de impresión: diseño tabular oficial dividido en dos secciones:
+ *   1) Pendientes de días anteriores (Atención prioritaria, del más antiguo al más reciente)
+ *   2) Reportes del día (generados el día de emisión del PDF)
  * ============================================================================
  */
 
@@ -30,7 +32,7 @@ const fd = (s) => (s ? s.split('-').reverse().join('/') : '');
 let allReportes = [];
 
 /* --------------------------------------------------------------------------
-   VISTA DE PANTALLA: Tabla de registros
+   VISTA DE PANTALLA: Tabla interactiva de registros
    -------------------------------------------------------------------------- */
 function renderTable(reportes) {
   const tbody = $('reportesTableBody');
@@ -85,169 +87,199 @@ function renderTable(reportes) {
 }
 
 /* --------------------------------------------------------------------------
-   VISTA DE IMPRESIÓN: Fichas completas con toda la info
+   Cálculo de días transcurridos
    -------------------------------------------------------------------------- */
-function renderPrintFichas(reportes) {
-  const container = $('reportesPrintList');
+function getDaysAgo(dateStr, todayIso) {
+  if (!dateStr) return 0;
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length !== 3) return 0;
+  const dOld = new Date(parts[0], parts[1] - 1, parts[2]);
+  const todayParts = todayIso.split('-').map(Number);
+  const dNow = new Date(todayParts[0], todayParts[1] - 1, todayParts[2]);
+  const diffTime = dNow.getTime() - dOld.getTime();
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
+/* --------------------------------------------------------------------------
+   VISTA DE IMPRESIÓN OFICIAL: Diseño tabular con secciones prioritarias
+   -------------------------------------------------------------------------- */
+function renderPrintDocument(reportes) {
+  const container = $('reportesPrintContainer');
   if (!container) return;
 
-  if (reportes.length === 0) {
+  const hoy = new Date();
+  hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
+  const todayIso = hoy.toISOString().slice(0, 10); // YYYY-MM-DD
+  const todayFmt = fd(todayIso); // DD/MM/AAAA
+
+  if ($('printDate')) {
+    $('printDate').textContent = todayFmt;
+  }
+
+  // Separar los reportes en:
+  // 1) Días anteriores (fecha < hoy)
+  // 2) Del día (fecha >= hoy o sin fecha)
+  const anteriores = [];
+  const delDia = [];
+
+  reportes.forEach((r) => {
+    const daysAgo = getDaysAgo(r.fecha, todayIso);
+    if (daysAgo > 0) {
+      anteriores.push({ ...r, _daysAgo: daysAgo });
+    } else {
+      delDia.push(r);
+    }
+  });
+
+  // Ordenar anteriores: del más antiguo al más reciente
+  anteriores.sort((a, b) => {
+    const da = a.fecha || '9999-99-99';
+    const db = b.fecha || '9999-99-99';
+    if (da !== db) return da.localeCompare(db);
+    return (a.folio || '').localeCompare(b.folio || '');
+  });
+
+  // Ordenar los del día por folio o ID
+  delDia.sort((a, b) => {
+    return (a.folio || '').localeCompare(b.folio || '');
+  });
+
+  // Totales oficiales para el encabezado
+  const total = reportes.length;
+  const totalAnteriores = anteriores.length;
+  const totalDelDia = delDia.length;
+
+  if ($('printTotalSummary')) {
+    $('printTotalSummary').textContent = `Total: ${total} reportes (${totalAnteriores} de días anteriores, ${totalDelDia} del día)`;
+  }
+
+  // Contadores de la tabla en pantalla
+  const totalLamparas = reportes.reduce((acc, r) => acc + (parseInt(r.numero_lamparas, 10) || 1), 0);
+  if ($('lblTotal')) $('lblTotal').textContent = total;
+  if ($('lblLamparas')) $('lblLamparas').textContent = totalLamparas;
+
+  if (total === 0) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No hay reportes para imprimir.</div></div>`;
     return;
   }
 
-  container.innerHTML = reportes.map((r, idx) => {
+  const theadHtml = `
+    <thead>
+      <tr class="print-table-subhead">
+        <th class="th-folio">FOLIO</th>
+        <th class="th-fecha">FECHA</th>
+        <th class="th-solicitante">SOLICITANTE / TELÉFONO</th>
+        <th class="th-domicilio">DOMICILIO / ENTRE CALLES</th>
+        <th class="th-lamparas">LÁMPARAS / TIPO</th>
+        <th class="th-falla">FALLA / REFERENCIAS</th>
+      </tr>
+    </thead>
+  `;
+
+  const renderPrintRow = (r, isAnterior) => {
     const fechaFmt = fd(r.fecha) || '—';
-    const ubicacionCompleta = [r.direccion, r.colonia_comunidad].filter(Boolean).join(', ') || '—';
+    const solicitante = esc(r.usuario || '—');
+    const telefono = r.telefono ? `Tel. ${esc(r.telefono)}` : 'Tel. —';
+
+    // Domicilio completo y Entre calles
+    const domParts = [];
+    if (r.direccion) domParts.push(r.direccion);
+    if (r.colonia_comunidad) domParts.push(`Col. ${r.colonia_comunidad}`);
+    const domicilio = domParts.join(', ') || '—';
+
+    let entreCalles = r.entre_calles ? r.entre_calles.trim() : '';
+    if (entreCalles) {
+      if (!/^entre\s+/i.test(entreCalles)) {
+        entreCalles = `Entre ${entreCalles}`;
+      }
+    } else {
+      entreCalles = '—';
+    }
+
+    // Cantidad de lámparas y tipo
+    const cant = parseInt(r.numero_lamparas, 10) || 1;
+    const cantText = cant === 1 ? '1 lámpara' : `${cant} lámparas`;
+    const tipoLampara = r.tipo_lampara || '—';
+
+    // Falla y referencias
+    const falla = esc(r.tipo_falla || '—');
+    let refText = r.referencias ? r.referencias.trim() : '';
+    if (refText) {
+      if (!/^ref\b/i.test(refText)) {
+        refText = `Ref. ${refText}`;
+      }
+    } else {
+      refText = 'Ref. —';
+    }
+
+    const fechaCellHtml = isAnterior && r._daysAgo > 0
+      ? `<div class="print-fecha-val">${fechaFmt}</div><div class="print-ago-text">hace ${r._daysAgo} ${r._daysAgo === 1 ? 'día' : 'días'}</div>`
+      : `<div class="print-fecha-val">${fechaFmt}</div>`;
 
     return `
-      <article class="report-card reporte-print-card" data-id="${r.id}">
-
-        <!-- Encabezado de la ficha -->
-        <header class="card-top">
-          <div class="card-folio-block">
-            <span>N.° ${idx + 1}</span>
-            <span>|</span>
-            <span>FOLIO ${esc(r.folio || 'S/F')}</span>
-          </div>
-          <span class="card-status-text">${esc(r.estatus || 'PENDIENTE')}</span>
-        </header>
-
-        <!-- Cuerpo de la ficha: todas las columnas de datos -->
-        <div class="reporte-print-body">
-
-          <!-- Columna izquierda -->
-          <div class="reporte-print-col">
-
-            <div class="reporte-print-row">
-              <div class="reporte-print-cell">
-                <span class="cell-caption">FECHA</span>
-                <span class="cell-data">${fechaFmt}</span>
-              </div>
-              <div class="reporte-print-cell">
-                <span class="cell-caption">NOMBRE DEL QUE ATIENDE</span>
-                <span class="cell-data">${esc(r.atendio || '—')}</span>
-              </div>
-            </div>
-
-            <div class="reporte-print-row">
-              <div class="reporte-print-cell reporte-cell-full">
-                <span class="cell-caption">USUARIO / SOLICITANTE</span>
-                <span class="cell-data">${esc(r.usuario || '—')}</span>
-              </div>
-              <div class="reporte-print-cell">
-                <span class="cell-caption">TELÉFONO DE CONTACTO</span>
-                <span class="cell-data">${esc(r.telefono || '—')}</span>
-              </div>
-            </div>
-
-            <div class="reporte-print-row">
-              <div class="reporte-print-cell reporte-cell-full">
-                <span class="cell-caption">DIRECCIÓN (CALLE Y NÚMERO)</span>
-                <span class="cell-data">${esc(r.direccion || '—')}</span>
-              </div>
-              <div class="reporte-print-cell">
-                <span class="cell-caption">COLONIA O COMUNIDAD</span>
-                <span class="cell-data">${esc(r.colonia_comunidad || '—')}</span>
-              </div>
-            </div>
-
-            <div class="reporte-print-row">
-              <div class="reporte-print-cell">
-                <span class="cell-caption">ENTRE QUÉ CALLES</span>
-                <span class="cell-data">${esc(r.entre_calles || '—')}</span>
-              </div>
-              <div class="reporte-print-cell">
-                <span class="cell-caption">REFERENCIAS DE UBICACIÓN</span>
-                <span class="cell-data">${esc(r.referencias || '—')}</span>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Columna derecha -->
-          <div class="reporte-print-col reporte-print-col-right">
-
-            <div class="reporte-print-row">
-              <div class="reporte-print-cell">
-                <span class="cell-caption">NÚM. DE LÁMPARAS</span>
-                <span class="cell-data reporte-num-destacado">${r.numero_lamparas || 1}</span>
-              </div>
-              <div class="reporte-print-cell">
-                <span class="cell-caption">TIPO DE LÁMPARA</span>
-                <span class="cell-data">${esc(r.tipo_lampara || '—')}</span>
-              </div>
-            </div>
-
-            <div class="reporte-print-row">
-              <div class="reporte-print-cell reporte-cell-full">
-                <span class="cell-caption">TIPO DE FALLA</span>
-                <span class="cell-data reporte-falla-text">${esc(r.tipo_falla || '—')}</span>
-              </div>
-            </div>
-
-            <div class="reporte-print-row reporte-row-obs">
-              <div class="reporte-print-cell reporte-cell-full">
-                <span class="cell-caption">OBSERVACIONES</span>
-                <span class="cell-data">${esc(r.observaciones || '—')}</span>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-
-        <!-- Espacio para firma de conformidad -->
-        <div class="reporte-print-firma">
-          <div class="reporte-firma-linea">
-            <div class="reporte-firma-box">
-              <div class="signature-line"></div>
-              <span class="signature-title">FIRMA DEL TÉCNICO QUE ATENDIÓ</span>
-              <span class="signature-name">${esc(r.atendio || '')}</span>
-            </div>
-            <div class="reporte-firma-box">
-              <div class="signature-line"></div>
-              <span class="signature-title">FIRMA DEL SOLICITANTE</span>
-              <span class="signature-name">${esc(r.usuario || '')}</span>
-            </div>
-          </div>
-        </div>
-
-      </article>
+      <tr class="${isAnterior ? 'print-row-anterior' : 'print-row-dia'}">
+        <td class="col-folio">${esc(r.folio || 'S/F')}</td>
+        <td class="col-fecha">${fechaCellHtml}</td>
+        <td class="col-solicitante">
+          <div class="print-title-bold">${solicitante}</div>
+          <div class="print-sub-text">${esc(telefono)}</div>
+        </td>
+        <td class="col-domicilio">
+          <div class="print-title-normal">${esc(domicilio)}</div>
+          <div class="print-sub-text">${esc(entreCalles)}</div>
+        </td>
+        <td class="col-lamparas">
+          <div class="print-title-normal">${cantText}</div>
+          <div class="print-sub-text">${esc(tipoLampara)}</div>
+        </td>
+        <td class="col-falla">
+          <div class="print-title-bold">${falla}</div>
+          <div class="print-sub-text">${esc(refText)}</div>
+        </td>
+      </tr>
     `;
-  }).join('');
+  };
 
-  /* ---------- KPIs del encabezado de impresión ---------- */
-  const total = reportes.length;
-  const totalLamparas = reportes.reduce((acc, r) => acc + (parseInt(r.numero_lamparas, 10) || 1), 0);
+  let sectionsHtml = '';
 
-  if ($('kTotal')) $('kTotal').textContent = total;
-  if ($('kLamparas')) $('kLamparas').textContent = totalLamparas;
-
-  // Rango de fechas
-  const fechas = reportes
-    .map((r) => r.fecha)
-    .filter(Boolean)
-    .sort();
-
-  if (fechas.length > 0) {
-    const desde = fd(fechas[0]);
-    const hasta = fd(fechas[fechas.length - 1]);
-    if ($('kFechaRango')) {
-      $('kFechaRango').textContent = desde === hasta ? desde : `${desde} – ${hasta}`;
-    }
+  // 1. Sección: PENDIENTES DE DÍAS ANTERIORES
+  if (anteriores.length > 0) {
+    sectionsHtml += `
+      <div class="print-section print-section-anteriores">
+        <div class="print-section-header-dark">
+          PENDIENTES DE DÍAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'reporte' : 'reportes'}, del más antiguo al más reciente) - ATENCIÓN PRIORITARIA
+        </div>
+        <table class="print-reports-table">
+          ${theadHtml}
+          <tbody>
+            ${anteriores.map((r) => renderPrintRow(r, true)).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
-  /* ---------- Contadores de la tabla en pantalla ---------- */
-  if ($('lblTotal')) $('lblTotal').textContent = total;
-  if ($('lblLamparas')) $('lblLamparas').textContent = totalLamparas;
-
-  /* ---------- Fecha de impresión ---------- */
-  if ($('printDate')) {
-    const hoy = new Date();
-    hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
-    $('printDate').textContent = hoy.toISOString().slice(0, 10).split('-').reverse().join('/');
+  // 2. Sección: REPORTES DEL DÍA
+  if (delDia.length > 0 || anteriores.length === 0) {
+    sectionsHtml += `
+      <div class="print-section print-section-dia">
+        <div class="print-section-header-gray">
+          REPORTES DEL DÍA ${todayFmt} (${delDia.length} ${delDia.length === 1 ? 'reporte' : 'reportes'})
+        </div>
+        <table class="print-reports-table">
+          ${theadHtml}
+          <tbody>
+            ${delDia.length > 0
+              ? delDia.map((r) => renderPrintRow(r, false)).join('')
+              : `<tr><td colspan="6" class="print-empty-row">No hay reportes registrados generados el día de hoy.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    `;
   }
+
+  container.innerHTML = sectionsHtml;
 }
 
 /* --------------------------------------------------------------------------
@@ -268,7 +300,7 @@ function applyFilterAndRender() {
   }
 
   renderTable(filtered);
-  renderPrintFichas(filtered);
+  renderPrintDocument(filtered);
 }
 
 /* --------------------------------------------------------------------------
@@ -288,7 +320,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     allReportes = [];
   }
 
-  // Ordenar más reciente primero
+  // Ordenar más reciente primero para la tabla en pantalla
   allReportes.sort((a, b) => {
     const ka = (b.fecha || '') + (b.created_at || '');
     const kb = (a.fecha || '') + (a.created_at || '');
@@ -306,4 +338,3 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.print();
   });
 });
-

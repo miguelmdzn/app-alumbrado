@@ -104,7 +104,7 @@ function renderTable(records) {
 
     const fechaFmt = fd(r.fecha);
     const horaFmt = r.hora || '';
-    const latFmt = r.lat != null ? Number(r.lat).toFixed(6) : '—';
+    const lonFmt = r.lon != null ? Number(r.lon).toFixed(6) : '—';
     const altFmt = r.alt || '—';
 
     return `
@@ -118,7 +118,7 @@ function renderTable(records) {
         <td class="td-tipo">
           <span class="badge-tipo">${esc(r.tipo || 'General')}</span>
         </td>
-        <td class="td-coord">${latFmt}</td>
+        <td class="td-coord">${lonFmt}</td>
         <td class="td-altitud">${esc(altFmt)}</td>
         <td class="td-center">${mapsIconHtml}</td>
         <td class="td-center">

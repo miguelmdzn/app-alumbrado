@@ -50,10 +50,121 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.app-sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--primary-dark);
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 100;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+  user-select: none;
+}
+
+.sidebar-brand {
+  padding: 18px 16px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-brand-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #F8FAFC;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-brand-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #FFFFFF;
+  line-height: 1.2;
+}
+
+.sidebar-brand-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94A3B8;
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 10px;
+  gap: 6px;
+  flex: 1;
+}
+
+.sidebar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: #CBD5E1;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.sidebar-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+}
+
+.sidebar-menu-item.active {
+  background: var(--primary);
+  color: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border-left: 3px solid #38BDF8;
+}
+
+.sidebar-menu-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.sidebar-menu-item.active .sidebar-menu-icon {
+  opacity: 1;
+  color: #38BDF8;
+}
+
+.app-main-content {
+  flex: 1;
+  min-width: 0;
+  background-color: var(--bg-app);
+  overflow-y: auto;
+}
+
 .app-container {
-  max-width: 980px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 24px 20px 48px;
+  padding: 24px 24px 48px;
 }
 
 /* --------------------------------------------------------------------------
@@ -1286,6 +1397,21 @@ body {
     print-color-adjust: exact !important;
   }
 
+  .app-shell {
+    display: block !important;
+    min-height: auto !important;
+  }
+
+  .app-sidebar {
+    display: none !important;
+  }
+
+  .app-main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
   .app-container {
     max-width: none !important;
     padding: 0 !important;
@@ -1452,133 +1578,209 @@ body {
 }
 
 /* ==========================================================================
-   FICHAS DE IMPRESIÓN — REGISTRO DE REPORTES (registros-reportes)
+   DISEÑO OFICIAL DE IMPRESIÓN — REGISTRO DE REPORTES (TABULAR CON PRIORIDADES)
    ========================================================================== */
 
-/* Ficha completa del reporte */
-.reporte-print-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-card);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  break-inside: avoid;
-  page-break-inside: avoid;
+.doc-header-reportes {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.doc-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.doc-title-reportes {
+  font-size: 21px;
+  font-weight: 800;
+  color: #000000;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.doc-subtitle-reportes {
+  font-size: 12px;
+  color: #333333;
+  margin-top: 3px;
+}
+
+.doc-header-right {
+  text-align: right;
+}
+
+.doc-total-reportes {
+  font-size: 12px;
+  font-style: italic;
+  color: #111111;
+}
+
+.doc-header-divider {
+  height: 2px;
+  background: #000000;
+  margin: 6px 0 12px 0;
+  border: none;
+}
+
+.print-section {
   margin-bottom: 16px;
+  page-break-inside: auto;
 }
 
-/* Cuerpo de la ficha: dos columnas de datos */
-.reporte-print-body {
-  display: grid;
-  grid-template-columns: 60% 40%;
-  min-height: 120px;
+.print-section-header-dark {
+  background: #000000 !important;
+  color: #FFFFFF !important;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 6px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
-.reporte-print-col {
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.print-section-header-gray {
+  background: #E2E8F0 !important;
+  color: #000000 !important;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 6px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-top: 1px solid #CBD5E1;
 }
 
-.reporte-print-col-right {
-  border-left: 1px solid var(--border-card);
-  background: var(--bg-muted);
+.print-reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
-/* Fila dentro de la columna */
-.reporte-print-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+.print-reports-table thead tr.print-table-subhead th {
+  background: #D1D5DB !important;
+  color: #000000 !important;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  text-align: left;
+  border-top: 1px solid #94A3B8;
+  border-bottom: 1px solid #94A3B8;
+  letter-spacing: 0.2px;
 }
 
-.reporte-print-row.reporte-row-obs {
-  grid-template-columns: 1fr;
+.th-folio { width: 7.5%; }
+.th-fecha { width: 11%; }
+.th-solicitante { width: 22%; }
+.th-domicilio { width: 25.5%; }
+.th-lamparas { width: 13%; }
+.th-falla { width: 21%; }
+
+.print-reports-table td {
+  padding: 7px 8px;
+  vertical-align: top;
+  border-bottom: 1px solid #CBD5E1;
+  word-break: break-word;
 }
 
-/* Celda de dato individual */
-.reporte-print-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* Fila de pendientes anteriores: sombreado slate sutil */
+.print-row-anterior {
+  background-color: #E2E8F0 !important;
 }
 
-.reporte-cell-full {
-  grid-column: 1 / -1;
+.print-row-anterior td {
+  border-bottom: 1px solid #CBD5E1;
 }
 
-/* Número de lámparas destacado */
-.reporte-num-destacado {
-  font-size: 22px !important;
-  font-weight: 800 !important;
-  color: var(--primary) !important;
-  line-height: 1.1;
+/* Fila de reportes del día: blanco limpio */
+.print-row-dia {
+  background-color: #FFFFFF !important;
 }
 
-/* Texto del tipo de falla */
-.reporte-falla-text {
+.print-row-dia td {
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.col-folio {
+  font-size: 15px;
+  font-weight: 800;
+  color: #000000;
+}
+
+.print-fecha-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.print-ago-text {
+  font-size: 9.5px;
+  color: #334155;
+  margin-top: 2px;
+}
+
+.print-title-bold {
+  font-size: 11.5px;
   font-weight: 700;
-  color: var(--danger);
+  color: #0F172A;
 }
 
-/* Bloque de firmas al pie de la ficha */
-.reporte-print-firma {
-  border-top: 1px solid var(--border-card);
-  padding: 10px 12px 12px;
-  background: #FAFAFA;
+.print-title-normal {
+  font-size: 11px;
+  color: #0F172A;
 }
 
-.reporte-firma-linea {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+.print-sub-text {
+  font-size: 10px;
+  color: #475569;
+  margin-top: 2px;
+  line-height: 1.35;
 }
 
-.reporte-firma-box {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.print-empty-row {
+  text-align: center;
+  padding: 14px;
+  color: #64748B;
+  font-style: italic;
+  font-size: 11px;
 }
 
-/* ==========================================================================
-   ESTILOS DE IMPRESIÓN PARA FICHAS DE REPORTES
-   ========================================================================== */
 @media print {
-  /* Fichas de reportes */
-  .reporte-print-card {
-    border: 1px solid #CBD5E1 !important;
-    margin-bottom: 10px !important;
-    box-shadow: none !important;
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
+  .print-reports-table {
+    page-break-inside: auto;
+    font-size: 11px !important;
   }
-
-  .reporte-print-body {
-    grid-template-columns: 60% 40% !important;
+  .print-reports-table thead tr.print-table-subhead th {
+    font-size: 10.5px !important;
   }
-
-  .reporte-print-col {
-    padding: 6px 8px !important;
-    gap: 4px !important;
+  .print-section-header-dark,
+  .print-section-header-gray {
+    font-size: 11.5px !important;
   }
-
-  .reporte-print-row {
-    gap: 6px !important;
+  .col-folio {
+    font-size: 15px !important;
   }
-
-  .reporte-num-destacado {
-    font-size: 18px !important;
+  .print-fecha-val {
+    font-size: 11px !important;
   }
-
-  .reporte-falla-text {
-    color: #C62828 !important;
+  .print-ago-text {
+    font-size: 9.5px !important;
   }
-
-  .reporte-print-firma {
-    padding: 6px 8px 10px !important;
+  .print-title-bold {
+    font-size: 11.5px !important;
   }
-
-  .reporte-firma-linea {
-    gap: 16px !important;
+  .print-title-normal {
+    font-size: 11px !important;
+  }
+  .print-sub-text {
+    font-size: 10px !important;
+  }
+  .print-reports-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .print-section {
+    page-break-inside: auto;
   }
 }
