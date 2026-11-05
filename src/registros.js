@@ -105,7 +105,7 @@ function renderTable(records) {
     const fechaFmt = fd(r.fecha);
     const horaFmt = r.hora || '';
     const lonFmt = r.lon != null ? Number(r.lon).toFixed(6) : '—';
-    const altFmt = r.alt || '—';
+    const latFmt = r.lat || '—';
 
     return `
       <tr data-record-id="${r.id}">
@@ -119,7 +119,7 @@ function renderTable(records) {
           <span class="badge-tipo">${esc(r.tipo || 'General')}</span>
         </td>
         <td class="td-coord">${lonFmt}</td>
-        <td class="td-altitud">${esc(altFmt)}</td>
+        <td class="td-altitud">${esc(latFmt)}</td>
         <td class="td-center">${mapsIconHtml}</td>
         <td class="td-center">
           <button type="button" class="btn btn-danger-outline btn-table-action" data-del="${r.id}" title="Eliminar registro">
