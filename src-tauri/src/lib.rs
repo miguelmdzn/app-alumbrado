@@ -104,7 +104,13 @@ fn get_evidencias_base_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 fn sanitize_folio(name: &str) -> String {
     let clean: String = name
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if clean.is_empty() {
         "reporte".into()
@@ -214,7 +220,10 @@ fn read_evidence_image(app: tauri::AppHandle, relative_path: String) -> Result<S
     let file_path = base_dir.join(clean_rel);
 
     if !file_path.exists() {
-        return Err(format!("El archivo de evidencia no existe: {}", file_path.display()));
+        return Err(format!(
+            "El archivo de evidencia no existe: {}",
+            file_path.display()
+        ));
     }
 
     let bytes = fs::read(&file_path).map_err(|e| e.to_string())?;
@@ -289,6 +298,219 @@ fn delete_evidence_image(app: tauri::AppHandle, relative_path: String) -> Result
     Ok(())
 }
 
+/// Abre una URL en el navegador predeterminado del sistema operativo
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("rundll32")
+            .args(["url.dll,FileProtocolHandler", &url])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+// ============================================================================
+// INTEGRACIÓN GOOGLE APPS SCRIPT (COMANDOS SEGUROS DESDE EL BACKEND RUST)
+// ============================================================================
+
+const KEYRING_SERVICE: &str = "app_alumbrado_publico_gas";
+const KEYRING_URL_KEY: &str = "endpoint_url";
+const KEYRING_TOKEN_KEY: &str = "secret_token";
+
+/// Guarda de forma segura la URL y el Token en el Administrador de Credenciales del SO
+#[tauri::command]
+fn save_gas_config(endpoint_url: String, secret_token: String) -> Result<(), String> {
+    let url_trimmed = endpoint_url.trim();
+    let token_trimmed = secret_token.trim();
+
+    if url_trimmed.is_empty() {
+        return Err("La URL del Web App no puede estar vacía.".into());
+    }
+    if !url_trimmed.starts_with("https://script.google.com/") {
+        return Err("La URL debe ser de Google Apps Script (iniciar con https://script.google.com/).".into());
+    }
+    if token_trimmed.is_empty() {
+        return Err("El Token Secreto no puede estar vacío.".into());
+    }
+
+    let entry_url = keyring::Entry::new(KEYRING_SERVICE, KEYRING_URL_KEY)
+        .map_err(|e| format!("Error en Credential Manager (URL): {}", e))?;
+    let entry_token = keyring::Entry::new(KEYRING_SERVICE, KEYRING_TOKEN_KEY)
+        .map_err(|e| format!("Error en Credential Manager (Token): {}", e))?;
+
+    entry_url.set_password(url_trimmed)
+        .map_err(|e| format!("No se pudo guardar la URL en el Administrador de Credenciales: {}", e))?;
+    entry_token.set_password(token_trimmed)
+        .map_err(|e| format!("No se pudo guardar el Token en el Administrador de Credenciales: {}", e))?;
+
+    Ok(())
+}
+
+/// Devuelve el estado de la configuración (NUNCA expone el token a JavaScript)
+#[tauri::command]
+fn get_gas_config_status() -> Result<serde_json::Value, String> {
+    let entry_url = keyring::Entry::new(KEYRING_SERVICE, KEYRING_URL_KEY)
+        .map_err(|e| e.to_string())?;
+    let entry_token = keyring::Entry::new(KEYRING_SERVICE, KEYRING_TOKEN_KEY)
+        .map_err(|e| e.to_string())?;
+
+    let url_opt = entry_url.get_password().ok();
+    let has_token = entry_token.get_password().is_ok();
+    let is_configured = url_opt.is_some() && has_token;
+
+    let display_url = match url_opt {
+        Some(u) if u.len() > 40 => {
+            format!("{}...{}", &u[..32], &u[u.len() - 10..])
+        }
+        Some(u) => u,
+        None => String::new(),
+    };
+
+    Ok(serde_json::json!({
+        "is_configured": is_configured,
+        "endpoint_url": display_url,
+        "has_token": has_token
+    }))
+}
+
+/// Prueba la conexión enviando una acción ping con el token secreto inyectado desde Rust
+#[tauri::command]
+async fn test_gas_connection() -> Result<serde_json::Value, String> {
+    let entry_url = keyring::Entry::new(KEYRING_SERVICE, KEYRING_URL_KEY)
+        .map_err(|e| e.to_string())?;
+    let entry_token = keyring::Entry::new(KEYRING_SERVICE, KEYRING_TOKEN_KEY)
+        .map_err(|e| e.to_string())?;
+
+    let url = entry_url.get_password()
+        .map_err(|_| "La URL de Google Apps Script no está configurada.".to_string())?;
+    let token = entry_token.get_password()
+        .map_err(|_| "El Token Secreto no está configurado.".to_string())?;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(35))
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .map_err(|e| format!("Error creando cliente HTTP: {}", e))?;
+
+    let payload = serde_json::json!({
+        "token": token,
+        "action": "ping"
+    });
+
+    let res = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| {
+            if e.is_timeout() {
+                "Tiempo de espera agotado al conectar con Google Apps Script (timeout 35s).".to_string()
+            } else if e.is_connect() {
+                "Sin conexión a internet o el servidor de Google no responde.".to_string()
+            } else {
+                format!("Error HTTP: {}", e)
+            }
+        })?;
+
+    let status = res.status();
+    let text = res.text().await.map_err(|e| format!("Error leyendo respuesta: {}", e))?;
+
+    let json: serde_json::Value = serde_json::from_str(&text).map_err(|_| {
+        format!(
+            "Google respondió con contenido no JSON (HTTP {}): {}",
+            status,
+            if text.len() > 140 { &text[..140] } else { &text }
+        )
+    })?;
+
+    if json.get("success").and_then(|v| v.as_bool()) == Some(true) {
+        Ok(json)
+    } else {
+        let err_msg = json.get("error").and_then(|e| e.as_str()).unwrap_or("Error en Apps Script");
+        Err(format!("Google Apps Script rechazó la prueba: {}", err_msg))
+    }
+}
+
+/// Envía un registro a Google Apps Script inyectando el token secreto desde Rust
+#[tauri::command]
+async fn send_gas_record(
+    table: String,
+    action: String,
+    record: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let entry_url = keyring::Entry::new(KEYRING_SERVICE, KEYRING_URL_KEY)
+        .map_err(|e| e.to_string())?;
+    let entry_token = keyring::Entry::new(KEYRING_SERVICE, KEYRING_TOKEN_KEY)
+        .map_err(|e| e.to_string())?;
+
+    let url = entry_url.get_password()
+        .map_err(|_| "La URL de Google Apps Script no está configurada.".to_string())?;
+    let token = entry_token.get_password()
+        .map_err(|_| "El Token Secreto no está configurado.".to_string())?;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(45))
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .map_err(|e| format!("Error cliente HTTP: {}", e))?;
+
+    let payload = serde_json::json!({
+        "token": token,
+        "table": table,
+        "action": action,
+        "record": record
+    });
+
+    let res = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| {
+            if e.is_connect() {
+                "Sin conexión a internet.".to_string()
+            } else if e.is_timeout() {
+                "Tiempo de espera agotado al enviar a Google Sheets.".to_string()
+            } else {
+                format!("Error de conexión: {}", e)
+            }
+        })?;
+
+    let status = res.status();
+    let text = res.text().await.map_err(|e| format!("Error leyendo respuesta: {}", e))?;
+
+    let json: serde_json::Value = serde_json::from_str(&text).map_err(|_| {
+        format!(
+            "Google respondió con formato no válido (HTTP {}): {}",
+            status,
+            if text.len() > 140 { &text[..140] } else { &text }
+        )
+    })?;
+
+    if json.get("success").and_then(|v| v.as_bool()) == Some(true) {
+        Ok(json)
+    } else {
+        let err_msg = json.get("error").and_then(|e| e.as_str()).unwrap_or("Error en Apps Script");
+        Err(err_msg.to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -300,7 +522,12 @@ pub fn run() {
             read_evidence_image,
             get_evidence_folder_path,
             open_evidence_folder,
-            delete_evidence_image
+            delete_evidence_image,
+            open_external_url,
+            save_gas_config,
+            get_gas_config_status,
+            test_gas_connection,
+            send_gas_record
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

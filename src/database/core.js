@@ -51,13 +51,15 @@ export function isSQLiteReady() {
 // Singleton de IndexedDB (respaldo offline)
 // ---------------------------------------------------------------------------
 const IDB_NAME   = 'alumbrado_publico_idb';
-const IDB_VERSION = 2;
+const IDB_VERSION = 4;
 
 // Registro de object stores para IDB — se expande conforme se crean módulos
 const IDB_STORES = [
   { name: 'evidencias',         keyPath: 'id' },
   { name: 'config_bitacora',    keyPath: 'clave' },
   { name: 'reportes',           keyPath: 'id' },
+  { name: 'personal',           keyPath: 'id' },
+  { name: 'dias_inhabiles',     keyPath: 'id' },
   // → Agregar aquí nuevas tablas según se expanda el sistema
 ];
 

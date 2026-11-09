@@ -54,6 +54,51 @@
           </svg>
           <span>Evidencias</span>
         </a>
+
+        <a href="personal.html" class="sidebar-menu-item" id="navSidebarPersonal">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Personal</span>
+        </a>
+
+        <!-- Menú desplegable Herramientas -->
+        <div class="sidebar-dropdown-group" id="navGroupHerramientas">
+          <a href="herramientas.html" class="sidebar-menu-item sidebar-dropdown-toggle" id="btnToggleHerramientas" aria-expanded="false">
+            <span class="sidebar-dropdown-label">
+              <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+              </svg>
+              <span>Herramientas</span>
+            </span>
+            <svg class="sidebar-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </a>
+          <div class="sidebar-submenu" id="sidebarSubmenuHerramientas">
+            <a href="justificantes.html" class="sidebar-submenu-item" id="navSubJustificantes">
+              <span class="sidebar-submenu-bullet">•</span> Justificantes
+            </a>
+            <a href="dias-inhabiles.html" class="sidebar-submenu-item" id="navSubDiasInhabiles">
+              <span class="sidebar-submenu-bullet">•</span> Días inhábiles
+            </a>
+            <a href="bitacoras-gasolina.html" class="sidebar-submenu-item" id="navSubGasolina">
+              <span class="sidebar-submenu-bullet">•</span> Bitacoras de gasolina
+            </a>
+            <a href="comunidades-colonias.html" class="sidebar-submenu-item" id="navSubComunidades">
+              <span class="sidebar-submenu-bullet">•</span> Comunidades y Colonias
+            </a>
+            <a href="requi.html" class="sidebar-submenu-item" id="navSubRequi">
+              <span class="sidebar-submenu-bullet">•</span> REQUI
+            </a>
+            <a href="ajustes-combustible.html" class="sidebar-submenu-item" id="navSubCombustible">
+              <span class="sidebar-submenu-bullet">•</span> Ajustes de Combustible
+            </a>
+          </div>
+        </div>
       </nav>
     </aside>
 
@@ -193,6 +238,32 @@
       </main>
     </div>
 
+  </div>
+
+  <!-- Modal: Ver detalle completo de la evidencia -->
+  <div id="modalDetalleEvidencia" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalDetalleEvidenciaTitle">
+    <div class="modal-card modal-card-detail">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalDetalleEvidenciaTitle">Detalle de Evidencia</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarDetalleEvidenciaX" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="detail-grid" id="modalDetalleEvidenciaContent"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCerrarDetalleEvidencia">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirmar eliminación -->
+  <div id="modalEliminarEvidencia" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalEliminarEvidenciaTitle">
+    <div class="modal-card">
+      <h2 class="modal-title" id="modalEliminarEvidenciaTitle">Confirmar eliminación</h2>
+      <p class="modal-text" id="modalEliminarEvidenciaTexto">¿Estás seguro de que deseas eliminar este reporte de evidencia?</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnEliminarEvidenciaNo">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-danger" id="btnEliminarEvidenciaSi">Eliminar</button>
+      </div>
+    </div>
   </div>
 
 </body>

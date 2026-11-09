@@ -32,7 +32,7 @@ const today = () => {
 
 let toastTimeout = null;
 let editingId = null;
-let editingEstatus = 'pendiente';
+let editingEstatus = 'En espera';
 
 /* --------------------------------------------------------------------------
    Notificaciones Toast
@@ -107,6 +107,20 @@ function setupConditionalFields() {
       if (otroFalla) otroFalla.value = '';
     }
   });
+
+  const estatus = $('estatus');
+  const wrapOtroEstatus = $('wrapOtroEstatus');
+  const otroEstatus = $('otroEstatus');
+
+  estatus?.addEventListener('change', () => {
+    if (estatus.value === 'Otro') {
+      wrapOtroEstatus?.classList.remove('hidden');
+      otroEstatus?.focus();
+    } else {
+      wrapOtroEstatus?.classList.add('hidden');
+      if (otroEstatus) otroEstatus.value = '';
+    }
+  });
 }
 
 /* --------------------------------------------------------------------------
@@ -126,7 +140,7 @@ function setEditMode(active) {
   }
 
   editingId = null;
-  editingEstatus = 'pendiente';
+  editingEstatus = 'En espera';
   if (title) title.textContent = 'Nuevo Reporte de Falla / Lámpara';
   if (pageTitle) pageTitle.textContent = 'Nuevo Reporte de Falla';
   if (btn) btn.textContent = 'Guardar reporte';
@@ -182,6 +196,7 @@ function fillForm(reporte) {
 
   applySelectValue($('tipoLampara'), reporte.tipo_lampara, $('wrapOtroLampara'), $('otroLampara'));
   applySelectValue($('tipoFalla'), reporte.tipo_falla, $('wrapOtroFalla'), $('otroFalla'));
+  applySelectValue($('estatus'), reporte.estatus || 'En espera', $('wrapOtroEstatus'), $('otroEstatus'));
 }
 
 async function loadReporteForEdit(id) {
@@ -193,7 +208,7 @@ async function loadReporteForEdit(id) {
     }
 
     editingId = reporte.id;
-    editingEstatus = reporte.estatus || 'pendiente';
+    editingEstatus = reporte.estatus || 'En espera';
     fillForm(reporte);
     setEditMode(true);
     $('folio')?.focus();
@@ -219,6 +234,9 @@ function resetForm() {
 
   $('wrapOtroLampara')?.classList.add('hidden');
   $('wrapOtroFalla')?.classList.add('hidden');
+  if ($('estatus')) $('estatus').value = 'En espera';
+  $('wrapOtroEstatus')?.classList.add('hidden');
+  if ($('otroEstatus')) $('otroEstatus').value = '';
   setEditMode(false);
 
   $('folio').focus();
@@ -266,21 +284,36 @@ $('reporteForm')?.addEventListener('submit', async (e) => {
     finalTipoFalla = selFalla.toUpperCase();
   }
 
+  // Resolver estatus (si es Otro, guardar como "Otro(ESPECIFICACIÓN)")
+  const selEstatus = $('estatus') ? $('estatus').value : 'En espera';
+  let finalEstatus = '';
+  if (selEstatus === 'Otro') {
+    const especEstatus = normalizeFinal($('otroEstatus').value);
+    if (!especEstatus) {
+      showToast('error', 'Por favor especifica el estatus en el campo habilitado.');
+      $('otroEstatus').focus();
+      return;
+    }
+    finalEstatus = `Otro(${especEstatus})`;
+  } else {
+    finalEstatus = selEstatus;
+  }
+
   const reportData = {
-    folio:             folioVal,
-    fecha:             $('fecha').value || today(),
-    atendio:           normalizeFinal($('atendio').value),
-    usuario:           normalizeFinal($('usuario').value),
-    direccion:         normalizeFinal($('direccion').value),
+    folio: folioVal,
+    fecha: $('fecha').value || today(),
+    atendio: normalizeFinal($('atendio').value),
+    usuario: normalizeFinal($('usuario').value),
+    direccion: normalizeFinal($('direccion').value),
     colonia_comunidad: normalizeFinal($('colonia').value),
-    telefono:          normalizeFinal($('telefono').value),
-    numero_lamparas:   parseInt($('numeroLamparas').value, 10) || 1,
-    tipo_lampara:      finalTipoLampara,
-    tipo_falla:        finalTipoFalla,
-    entre_calles:      normalizeFinal($('entreCalles').value),
-    referencias:       normalizeFinal($('referencias').value),
-    observaciones:     normalizeFinal($('observaciones').value),
-    estatus:           editingId ? editingEstatus : 'pendiente'
+    telefono: normalizeFinal($('telefono').value),
+    numero_lamparas: parseInt($('numeroLamparas').value, 10) || 1,
+    tipo_lampara: finalTipoLampara,
+    tipo_falla: finalTipoFalla,
+    entre_calles: normalizeFinal($('entreCalles').value),
+    referencias: normalizeFinal($('referencias').value),
+    observaciones: normalizeFinal($('observaciones').value),
+    estatus: finalEstatus || (editingId ? editingEstatus : 'En espera')
   };
 
   if (editingId) reportData.id = editingId;
@@ -314,5 +347,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (editId) {
     await loadReporteForEdit(editId);
   }
+
+  // Toggle de submenú Herramientas en barra lateral
+  $('btnToggleHerramientas')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const group = $('navGroupHerramientas');
+    if (group) {
+      const isOpen = group.classList.toggle('is-open');
+      $('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
+    }
+  });
 });
 

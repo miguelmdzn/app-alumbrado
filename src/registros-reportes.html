@@ -25,7 +25,8 @@
     <aside class="app-sidebar noprint">
       <div class="sidebar-brand">
         <div class="sidebar-brand-badge">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="2" x2="12" y2="6"></line>
             <line x1="12" y1="18" x2="12" y2="22"></line>
             <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
@@ -44,7 +45,8 @@
 
       <nav class="sidebar-menu">
         <a href="registros-reportes.html" class="sidebar-menu-item active" id="navSidebarReportes">
-          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
             <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -55,12 +57,64 @@
         </a>
 
         <a href="registros.html" class="sidebar-menu-item" id="navSidebarEvidencias">
-          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
             <circle cx="12" cy="13" r="4"></circle>
           </svg>
           <span>Evidencias</span>
         </a>
+
+        <a href="personal.html" class="sidebar-menu-item" id="navSidebarPersonal">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Personal</span>
+        </a>
+
+        <!-- Menú desplegable Herramientas -->
+        <div class="sidebar-dropdown-group" id="navGroupHerramientas">
+          <a href="herramientas.html" class="sidebar-menu-item sidebar-dropdown-toggle" id="btnToggleHerramientas"
+            aria-expanded="false">
+            <span class="sidebar-dropdown-label">
+              <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
+                </path>
+              </svg>
+              <span>Herramientas</span>
+            </span>
+            <svg class="sidebar-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </a>
+          <div class="sidebar-submenu" id="sidebarSubmenuHerramientas">
+            <a href="justificantes.html" class="sidebar-submenu-item" id="navSubJustificantes">
+              <span class="sidebar-submenu-bullet">•</span> Justificantes
+            </a>
+            <a href="dias-inhabiles.html" class="sidebar-submenu-item" id="navSubDiasInhabiles">
+              <span class="sidebar-submenu-bullet">•</span> Días inhábiles
+            </a>
+            <a href="bitacoras-gasolina.html" class="sidebar-submenu-item" id="navSubGasolina">
+              <span class="sidebar-submenu-bullet">•</span> Bitacoras de gasolina
+            </a>
+            <a href="comunidades-colonias.html" class="sidebar-submenu-item" id="navSubComunidades">
+              <span class="sidebar-submenu-bullet">•</span> Comunidades y Colonias
+            </a>
+            <a href="requi.html" class="sidebar-submenu-item" id="navSubRequi">
+              <span class="sidebar-submenu-bullet">•</span> REQUI
+            </a>
+            <a href="ajustes-combustible.html" class="sidebar-submenu-item" id="navSubCombustible">
+              <span class="sidebar-submenu-bullet">•</span> Ajustes de Combustible
+            </a>
+          </div>
+        </div>
       </nav>
     </aside>
 
@@ -82,7 +136,8 @@
 
             <div class="nav-actions">
               <a href="reportes.html" class="btn btn-secondary btn-nav-link" id="btnBackToForm">
-                <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                   <polyline points="14 2 14 8 20 8"></polyline>
                   <line x1="12" y1="18" x2="12" y2="12"></line>
@@ -92,7 +147,8 @@
               </a>
 
               <button type="button" class="btn btn-primary btn-nav-link" id="btnExportPdf">
-                <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="6 9 6 2 18 2 18 9"></polyline>
                   <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
                   <rect x="6" y="14" width="12" height="8"></rect>
@@ -107,11 +163,13 @@
             <div class="records-toolbar">
               <div class="records-toolbar-left">
                 <div class="records-search-wrapper">
-                  <input type="search" id="searchInput" placeholder="Buscar por folio, usuario, colonia, tipo de falla..." class="field-input">
+                  <input type="search" id="searchInput"
+                    placeholder="Buscar por folio, usuario, colonia, tipo de falla..." class="field-input">
                 </div>
-                <select id="filterEstatus" class="field-select records-status-select" aria-label="Mostrar reportes por estatus">
-                  <option value="pendiente" selected>Pendientes</option>
-                  <option value="atendido">Atendidos</option>
+                <select id="filterEstatus" class="field-select records-status-select"
+                  aria-label="Mostrar reportes por estatus">
+                  <option value="sin_atender" selected>SIN ATENDER</option>
+                  <option value="atendido">ATENDIDO</option>
                 </select>
               </div>
 
@@ -128,9 +186,9 @@
                     <th>Folio</th>
                     <th>Fecha</th>
                     <th>Atendió</th>
-                    <th>Usuario / Solicitante</th>
+                    <th>Solicitante</th>
                     <th>Ubicación</th>
-                    <th>Colonia</th>
+                    <th>Localidad / Colonia</th>
                     <th>Teléfono</th>
                     <th>Lámparas</th>
                     <th>Tipo Lámpara</th>
@@ -158,10 +216,12 @@
             <div class="doc-header-row">
               <div>
                 <h1 class="doc-title-reportes">REGISTRO DE REPORTES</h1>
-                <div class="doc-subtitle-reportes">Alumbrado Público &nbsp;|&nbsp; Fecha: <span id="printDate"></span></div>
+                <div class="doc-subtitle-reportes">Alumbrado Público &nbsp;|&nbsp; Fecha: <span id="printDate"></span>
+                </div>
               </div>
               <div class="doc-header-right">
-                <div class="doc-total-reportes" id="printTotalSummary">Total: 0 reportes (0 de días anteriores, 0 del día)</div>
+                <div class="doc-total-reportes" id="printTotalSummary">Total: 0 reportes (0 de días anteriores, 0 del
+                  día)</div>
               </div>
             </div>
             <div class="doc-header-divider"></div>
@@ -177,13 +237,43 @@
 
   </div>
 
-  <div id="modalAtendido" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalAtendidoTitle">
+  <!-- Modal 1: Confirmar atención -->
+  <div id="modalAtendido" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modalAtendidoTitle">
     <div class="modal-card">
       <h2 class="modal-title" id="modalAtendidoTitle">Confirmar atención</h2>
-      <p class="modal-text">El reporte se marcara como atendido</p>
+      <p class="modal-text">¿Deseas marcar este reporte como atendido?</p>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="modalAtendidoNo">No</button>
         <button type="button" class="btn btn-primary" id="modalAtendidoSi">Sí</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Opciones de finalización (Solo terminado vs Añadir a evidencia) -->
+  <div id="modalOpcionesAtendido" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modalOpcionesTitle">
+    <div class="modal-card">
+      <h2 class="modal-title" id="modalOpcionesTitle">Finalizar Reporte</h2>
+      <p class="modal-text">¿Cómo deseas registrar la finalización del reporte?</p>
+      <div class="modal-actions modal-actions-options">
+        <button type="button" class="btn btn-secondary" id="btnSoloTerminado">Solo terminado</button>
+        <button type="button" class="btn btn-primary" id="btnAnadirEvidencia">Añadir a evidencia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Ver detalle completo del reporte -->
+  <div id="modalDetalleReporte" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modalDetalleTitle">
+    <div class="modal-card modal-card-detail">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalDetalleTitle">Detalle del Reporte</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarDetalleX" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="detail-grid" id="modalDetalleContent"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCerrarDetalle">Cerrar</button>
       </div>
     </div>
   </div>

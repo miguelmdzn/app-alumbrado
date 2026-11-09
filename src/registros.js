@@ -15,6 +15,8 @@ import {
   deleteEvidencia,
   loadMetadatos,
   openEvidenciasFolder,
+  getAllPersonal,
+  getFullName,
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
@@ -31,14 +33,53 @@ const esc = (s) =>
 
 const fd = (s) => (s ? s.split('-').reverse().join('/') : '');
 
+const PENCIL_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 20h9"></path>
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+  </svg>
+`;
+
+const EYE_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </svg>
+`;
+
+const TRASH_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="3 6 5 6 21 6"></polyline>
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    <line x1="10" y1="11" x2="10" y2="17"></line>
+    <line x1="14" y1="11" x2="14" y2="17"></line>
+  </svg>
+`;
+
 // Estado en memoria
 let allRecords = [];
+let personalMap = new Map();
 let metadata = {
   fecha: '',
   area: 'Alumbrado Público',
   elab: '',
   reviso: ''
 };
+
+function formatAtendioDisplay(atendioRaw) {
+  if (!atendioRaw) return '';
+  const tokens = String(atendioRaw).split(',').map((t) => t.trim()).filter(Boolean);
+  if (tokens.length === 0) return '';
+  const names = tokens.map((tok) => {
+    const p = personalMap.get(tok);
+    if (p) {
+      const full = getFullName(p);
+      if (full) return full;
+    }
+    return tok;
+  });
+  return names.join(', ');
+}
 
 /* --------------------------------------------------------------------------
    Generador de Códigos QR para la Bitácora Oficial de Impresión
@@ -122,25 +163,143 @@ function renderTable(records) {
         <td class="td-altitud">${esc(latFmt)}</td>
         <td class="td-center">${mapsIconHtml}</td>
         <td class="td-center">
-          <button type="button" class="btn btn-danger-outline btn-table-action" data-del="${r.id}" title="Eliminar registro">
-            Eliminar
-          </button>
+          <div class="table-actions">
+            <button type="button" class="btn-icon-action" data-ver="${esc(r.id)}" title="Ver detalle de la evidencia" aria-label="Ver detalle de la evidencia">${EYE_ICON}</button>
+            <a class="btn-icon-action" href="index.html?edit=${encodeURIComponent(r.id)}" title="Editar evidencia" aria-label="Editar evidencia">${PENCIL_ICON}</a>
+            <button type="button" class="btn-icon-action btn-icon-action-danger" data-del="${esc(r.id)}" title="Eliminar evidencia" aria-label="Eliminar evidencia">${TRASH_ICON}</button>
+          </div>
         </td>
       </tr>
     `;
   }).join('');
 
+  // Vincular eventos de "Ver" detalle
+  tbody.querySelectorAll('[data-ver]').forEach((btn) => {
+    btn.onclick = () => openDetalleEvidenciaModal(btn.dataset.ver);
+  });
+
   // Vincular eventos de eliminación en tabla
   tbody.querySelectorAll('[data-del]').forEach((btn) => {
-    btn.onclick = async () => {
-      const id = btn.dataset.del;
-      if (confirm('¿Estás seguro de que deseas eliminar este reporte de evidencias?')) {
-        await deleteEvidencia(id);
-        allRecords = allRecords.filter((x) => x.id !== id);
-        applyFilterAndRender();
-      }
-    };
+    btn.onclick = () => openEliminarEvidenciaModal(btn.dataset.del);
   });
+}
+
+/* --------------------------------------------------------------------------
+   Gestión de Modales de Evidencias (Detalle y Eliminación)
+   -------------------------------------------------------------------------- */
+let pendingDeleteEvidenciaId = null;
+
+function openDetalleEvidenciaModal(id) {
+  const r = allRecords.find((x) => x.id === id);
+  if (!r) return;
+
+  const content = $('modalDetalleEvidenciaContent');
+  if (!content) return;
+
+  const atendioFmt = formatAtendioDisplay(r.atendio) || '—';
+  const fechaFmt = fd(r.fecha) || '—';
+  const horaFmt = r.hora ? `${r.hora} hrs` : '—';
+  const coords = (r.lat != null && r.lon != null) ? `${r.lat}, ${r.lon}` : '—';
+  const mapsLink = r.mapsUrl
+    ? `<a href="${esc(r.mapsUrl)}" target="_blank" rel="noopener" style="color: var(--primary); font-weight: 600; text-decoration: underline;">Abrir en Google Maps</a>`
+    : '—';
+
+  let fotosHtml = '';
+  const f1 = r.fotos?.[0];
+  const f2 = r.fotos?.[1];
+  if (f1 || f2) {
+    fotosHtml = `
+      <div class="detail-item" style="grid-column: span 2;">
+        <span class="detail-label">Fotografías adjuntas:</span>
+        <div style="display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+          ${f1 ? `<div style="flex: 1; min-width: 180px;"><img src="${f1}" style="width: 100%; max-height: 220px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-line);" alt="Foto 1"></div>` : ''}
+          ${f2 ? `<div style="flex: 1; min-width: 180px;"><img src="${f2}" style="width: 100%; max-height: 220px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-line);" alt="Foto 2"></div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  content.innerHTML = `
+    <div class="detail-item">
+      <span class="detail-label">Folio:</span>
+      <span class="detail-value"><strong>${esc(r.folio || 'S/F')}</strong></span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Fecha y Hora:</span>
+      <span class="detail-value">${fechaFmt} · ${horaFmt}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Solicitante:</span>
+      <span class="detail-value">${esc(r.solicita || '—')}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Turno:</span>
+      <span class="detail-value">${esc(r.turno || '—')}</span>
+    </div>
+    <div class="detail-item" style="grid-column: span 2;">
+      <span class="detail-label">Personal que atendió:</span>
+      <span class="detail-value"><strong>${esc(atendioFmt)}</strong></span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Tipo de reporte:</span>
+      <span class="detail-value">${esc(r.tipo || '—')}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Estatus:</span>
+      <span class="detail-value">${esc(r.estatus || 'Atendido')}</span>
+    </div>
+    <div class="detail-item" style="grid-column: span 2;">
+      <span class="detail-label">Ubicación / Domicilio:</span>
+      <span class="detail-value">${esc(r.ubicacion || '—')}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Coordenadas:</span>
+      <span class="detail-value">${esc(coords)}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Google Maps:</span>
+      <span class="detail-value">${mapsLink}</span>
+    </div>
+    <div class="detail-item" style="grid-column: span 2;">
+      <span class="detail-label">Acción realizada:</span>
+      <span class="detail-value">${esc(r.accion || '—')}</span>
+    </div>
+    ${fotosHtml}
+  `;
+
+  $('modalDetalleEvidencia')?.classList.remove('hidden');
+}
+
+function closeDetalleEvidenciaModal() {
+  $('modalDetalleEvidencia')?.classList.add('hidden');
+}
+
+function openEliminarEvidenciaModal(id) {
+  pendingDeleteEvidenciaId = id;
+  const r = allRecords.find((x) => x.id === id);
+  const folio = r?.folio || 'este reporte';
+  if ($('modalEliminarEvidenciaTexto')) {
+    $('modalEliminarEvidenciaTexto').textContent = `¿Estás seguro de que deseas eliminar la evidencia del folio "${folio}"?`;
+  }
+  $('modalEliminarEvidencia')?.classList.remove('hidden');
+}
+
+function closeEliminarEvidenciaModal() {
+  pendingDeleteEvidenciaId = null;
+  $('modalEliminarEvidencia')?.classList.add('hidden');
+}
+
+async function confirmEliminarEvidencia() {
+  const id = pendingDeleteEvidenciaId;
+  closeEliminarEvidenciaModal();
+  if (!id) return;
+  try {
+    await deleteEvidencia(id);
+    allRecords = allRecords.filter((x) => x.id !== id);
+    applyFilterAndRender();
+  } catch (err) {
+    console.error('Error al eliminar evidencia:', err);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -226,7 +385,7 @@ function renderCardBitacora(r, index) {
           </div>
           <div class="card-cell">
             <span class="cell-caption">ATENDIÓ / TURNO</span>
-            <span class="cell-data">${esc(r.atendio) || '—'}${r.turno ? ' (' + esc(r.turno) + ')' : ''}</span>
+            <span class="cell-data">${esc(formatAtendioDisplay(r.atendio)) || '—'}${r.turno ? ' (' + esc(r.turno) + ')' : ''}</span>
           </div>
 
           <!-- Fila 3 -->
@@ -312,8 +471,9 @@ function applyFilterAndRender() {
       const tipo = (r.tipo || '').toLowerCase();
       const ubicacion = (r.ubicacion || '').toLowerCase();
       const solicita = (r.solicita || '').toLowerCase();
-      const atendio = (r.atendio || '').toLowerCase();
-      return folio.includes(query) || tipo.includes(query) || ubicacion.includes(query) || solicita.includes(query) || atendio.includes(query);
+      const atendioRaw = (r.atendio || '').toLowerCase();
+      const atendioNom = formatAtendioDisplay(r.atendio).toLowerCase();
+      return folio.includes(query) || tipo.includes(query) || ubicacion.includes(query) || solicita.includes(query) || atendioRaw.includes(query) || atendioNom.includes(query);
     });
   }
 
@@ -335,6 +495,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   const loadedMeta = await loadMetadatos();
   if (loadedMeta) {
     metadata = { ...metadata, ...loadedMeta };
+  }
+
+  // Cargar catálogo de personal para resolver nombres
+  try {
+    const personalList = await getAllPersonal();
+    personalMap = new Map((personalList || []).map((p) => [p.id, p]));
+  } catch (err) {
+    console.warn('Error al consultar personal:', err);
+    personalMap = new Map();
   }
 
   // Cargar todas las evidencias desde SQLite (con fotos desde el disco)
@@ -366,6 +535,29 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Botón: Abrir carpeta de fotos en el explorador
   $('btnOpenFolder')?.addEventListener('click', async () => {
     await openEvidenciasFolder();
+  });
+
+  // Modales de detalle y confirmación de eliminación
+  $('btnCerrarDetalleEvidenciaX')?.addEventListener('click', closeDetalleEvidenciaModal);
+  $('btnCerrarDetalleEvidencia')?.addEventListener('click', closeDetalleEvidenciaModal);
+  $('modalDetalleEvidencia')?.addEventListener('click', (e) => {
+    if (e.target === $('modalDetalleEvidencia')) closeDetalleEvidenciaModal();
+  });
+
+  $('btnEliminarEvidenciaNo')?.addEventListener('click', closeEliminarEvidenciaModal);
+  $('btnEliminarEvidenciaSi')?.addEventListener('click', confirmEliminarEvidencia);
+  $('modalEliminarEvidencia')?.addEventListener('click', (e) => {
+    if (e.target === $('modalEliminarEvidencia')) closeEliminarEvidenciaModal();
+  });
+
+  // Toggle de submenú Herramientas en barra lateral
+  $('btnToggleHerramientas')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const group = $('navGroupHerramientas');
+    if (group) {
+      const isOpen = group.classList.toggle('is-open');
+      $('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
+    }
   });
 });
 

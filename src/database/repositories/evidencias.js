@@ -190,6 +190,34 @@ export async function getAllEvidencias() {
 }
 
 /**
+ * Obtiene un registro de evidencia específico por su UUID con sus fotos
+ */
+export async function getEvidenciaById(id) {
+  let row = null;
+  if (isSQLiteReady()) {
+    try {
+      const rows = await getSQLite().select(`SELECT * FROM ${TABLE} WHERE id = $1 LIMIT 1;`, [id]);
+      if (rows && rows.length > 0) row = rows[0];
+    } catch (err) {
+      console.error(`[evidencias] SQLite getById error:`, err);
+    }
+  }
+
+  if (!row) {
+    const all = await idbGetAll(TABLE);
+    row = all.find((x) => x.id === id);
+  }
+
+  if (!row) return null;
+
+  const item = toFrontend(row);
+  const f0 = item.fotoRefs[0] ? await loadEvidenceFile(item.fotoRefs[0]) : null;
+  const f1 = item.fotoRefs[1] ? await loadEvidenceFile(item.fotoRefs[1]) : null;
+  item.fotos = [f0, f1];
+  return item;
+}
+
+/**
  * Elimina un registro por su UUID y borra sus archivos en disco
  */
 export async function deleteEvidencia(id) {

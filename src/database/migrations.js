@@ -126,6 +126,78 @@ const MIGRATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // v4 — Índice de estatus en reportes para optimizar consultas y reportes
+  // -------------------------------------------------------------------------
+  {
+    version: 4,
+    name: 'add_index_reportes_estatus',
+    up: `
+      CREATE INDEX IF NOT EXISTS idx_reportes_estatus
+        ON reportes (estatus);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v5 — Tabla de personal de Alumbrado Público
+  // -------------------------------------------------------------------------
+  {
+    version: 5,
+    name: 'create_personal',
+    up: `
+      CREATE TABLE IF NOT EXISTS personal (
+        id                       TEXT PRIMARY KEY,
+        nombres                  TEXT,
+        apellido1                TEXT,
+        apellido2                TEXT,
+        cargo                    TEXT,
+        numero_trabajador        TEXT,
+        numero_checador_digital  TEXT,
+        estatus                  TEXT DEFAULT 'Activo',
+        created_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at               TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_personal_estatus
+        ON personal (estatus);
+
+      CREATE INDEX IF NOT EXISTS idx_personal_nombres
+        ON personal (nombres, apellido1);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v6 — Tabla de días inhábiles (oficiales de México y asuetos municipales)
+  // -------------------------------------------------------------------------
+  {
+    version: 6,
+    name: 'create_dias_inhabiles',
+    up: `
+      CREATE TABLE IF NOT EXISTS dias_inhabiles (
+        id           TEXT PRIMARY KEY,
+        fecha        TEXT NOT NULL,
+        descripcion  TEXT NOT NULL,
+        tipo         TEXT NOT NULL DEFAULT 'Oficial',
+        year         INTEGER NOT NULL,
+        activo       INTEGER NOT NULL DEFAULT 1,
+        created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_dias_inhabiles_fecha
+        ON dias_inhabiles (fecha);
+
+      CREATE INDEX IF NOT EXISTS idx_dias_inhabiles_year
+        ON dias_inhabiles (year);
+
+      CREATE INDEX IF NOT EXISTS idx_dias_inhabiles_tipo
+        ON dias_inhabiles (tipo);
+
+      CREATE INDEX IF NOT EXISTS idx_dias_inhabiles_activo
+        ON dias_inhabiles (activo);
+    `
+  },
+
+  // -------------------------------------------------------------------------
   // → PLANTILLA para futuras tablas — copiar y ajustar
   //
   // {

@@ -39,6 +39,7 @@ export { initDatabase, generateUUID, DB_NAME } from './database/core.js';
 export {
   saveEvidencia,
   getAllEvidencias,
+  getEvidenciaById,
   deleteEvidencia,
   clearAllEvidencias,
 } from './database/repositories/evidencias.js';
@@ -68,5 +69,23 @@ export {
   getReporteById,
 } from './database/repositories/reportes.js';
 
-// ---- Futuras tablas — agrega sus re-exportaciones aquí --------------------
-// export { ... } from './database/repositories/<nueva_tabla>.js';
+// ---- Repositorio: personal (plantilla de trabajadores) ---------------------
+export {
+  savePersonal,
+  getAllPersonal,
+  deletePersonal,
+  getPersonalById,
+  getFullName,
+} from './database/repositories/personal.js';
+
+// ---- Repositorio: dias_inhabiles (feriados oficiales y asuetos municipales) -
+export {
+  saveDiaInhabil,
+  getAllDiasInhabiles,
+  getDiaInhabilById,
+  deleteDiaInhabil,
+  syncOfficialHolidays,
+  getActiveHolidaysSet,
+  countBusinessDays,
+  getOfficialMexicanHolidays,
+} from './database/repositories/diasInhabiles.js';

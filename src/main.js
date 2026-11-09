@@ -6,9 +6,12 @@
 import {
   initDatabase,
   saveEvidencia,
+  getEvidenciaById,
   saveMetadatos,
   loadMetadatos,
   generateUUID,
+  getAllPersonal,
+  getFullName,
 } from './db.js';
 
 import {
@@ -35,6 +38,7 @@ let metaState = {
 
 let fotos = [null, null];
 let toastTimeout = null;
+let editingEvidenciaId = null;
 
 /* --------------------------------------------------------------------------
    Notificaciones Toast ("Evidencia agregada correctamente" / "Ocurrió un error")
@@ -480,6 +484,248 @@ async function obtenerCoordenadasDelLink() {
   msgEl.textContent = 'No se encontraron coordenadas en el enlace. Puedes ingresarlas manualmente.';
 }
 
+const esc = (s) =>
+  String(s ?? '').replace(/[&<>"]/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+  }[c]));
+
+/* --------------------------------------------------------------------------
+   Catálogo de Personal y Autocomplete Multi-Select con Chips
+   -------------------------------------------------------------------------- */
+let allPersonal = [];
+let selectedPersonalIds = [];
+let multiselectHighlightedIndex = -1;
+let currentFilteredPersonal = [];
+
+function renderChips() {
+  const box = $('atendioChipsBox');
+  const input = $('atendioSearchInput');
+  const hiddenInput = $('atendio');
+  if (!box || !input) return;
+
+  // Eliminar chips existentes
+  const oldChips = box.querySelectorAll('.multiselect-chip');
+  oldChips.forEach((c) => c.remove());
+
+  // Insertar cada chip antes del input
+  selectedPersonalIds.forEach((id) => {
+    const p = allPersonal.find((item) => item.id === id);
+    const name = p ? getFullName(p) : id;
+
+    const chip = document.createElement('span');
+    chip.className = 'multiselect-chip';
+    chip.dataset.id = id;
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'multiselect-chip-text';
+    textSpan.textContent = name;
+    textSpan.title = name;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'multiselect-chip-remove';
+    removeBtn.setAttribute('aria-label', `Quitar ${name}`);
+    removeBtn.innerHTML = '&times;';
+    removeBtn.onclick = (e) => {
+      e.stopPropagation();
+      removePersonalChip(id);
+    };
+
+    chip.appendChild(textSpan);
+    chip.appendChild(removeBtn);
+
+    box.insertBefore(chip, input);
+  });
+
+  if (hiddenInput) {
+    hiddenInput.value = selectedPersonalIds.join(',');
+  }
+}
+
+function removePersonalChip(id) {
+  selectedPersonalIds = selectedPersonalIds.filter((item) => item !== id);
+  renderChips();
+  $('atendioSearchInput')?.focus();
+}
+
+function addPersonalChip(id) {
+  if (!id) return;
+  if (!selectedPersonalIds.includes(id)) {
+    selectedPersonalIds.push(id);
+    renderChips();
+  }
+  const input = $('atendioSearchInput');
+  if (input) input.value = '';
+  closeAtendioDropdown();
+  input?.focus();
+}
+
+function filterPersonalList(query) {
+  const q = (query || '').trim().toLowerCase();
+  const available = allPersonal.filter((p) => !selectedPersonalIds.includes(p.id));
+
+  if (!q) {
+    return available.filter((p) => (p.estatus || 'Activo') === 'Activo').slice(0, 15);
+  }
+
+  return available.filter((p) => {
+    const full = getFullName(p).toLowerCase();
+    const cargo = (p.cargo || '').toLowerCase();
+    const numT = (p.numero_trabajador || '').toLowerCase();
+    const numC = (p.numero_checador_digital || '').toLowerCase();
+    return full.includes(q) || cargo.includes(q) || numT.includes(q) || numC.includes(q);
+  });
+}
+
+function openAtendioDropdown(query = '') {
+  const dropdown = $('atendioDropdown');
+  if (!dropdown) return;
+
+  currentFilteredPersonal = filterPersonalList(query);
+  multiselectHighlightedIndex = currentFilteredPersonal.length > 0 ? 0 : -1;
+
+  if (currentFilteredPersonal.length === 0) {
+    const hasAny = allPersonal.length > 0;
+    dropdown.innerHTML = `
+      <div class="multiselect-empty">
+        ${hasAny ? 'No se encontró personal con ese nombre.' : 'No hay personal registrado en la plantilla.'}
+      </div>
+    `;
+  } else {
+    dropdown.innerHTML = currentFilteredPersonal.map((p, idx) => {
+      const name = getFullName(p) || 'Sin nombre';
+      const cargo = p.cargo ? esc(p.cargo) : '';
+      const numT = p.numero_trabajador ? `Núm. ${esc(p.numero_trabajador)}` : '';
+      const subParts = [cargo, numT].filter(Boolean).join(' • ');
+
+      return `
+        <div class="multiselect-item ${idx === 0 ? 'active' : ''}" data-index="${idx}" data-id="${esc(p.id)}">
+          <div class="multiselect-item-name">${esc(name)}</div>
+          ${subParts ? `<div class="multiselect-item-sub">${subParts}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    dropdown.querySelectorAll('.multiselect-item').forEach((item) => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        addPersonalChip(item.dataset.id);
+      };
+      item.onmouseenter = () => {
+        setHighlightedIndex(Number(item.dataset.index));
+      };
+    });
+  }
+
+  dropdown.classList.remove('hidden');
+}
+
+function closeAtendioDropdown() {
+  multiselectHighlightedIndex = -1;
+  currentFilteredPersonal = [];
+  $('atendioDropdown')?.classList.add('hidden');
+}
+
+function setHighlightedIndex(index) {
+  multiselectHighlightedIndex = index;
+  const dropdown = $('atendioDropdown');
+  if (!dropdown) return;
+  const items = dropdown.querySelectorAll('.multiselect-item');
+  items.forEach((item, idx) => {
+    if (idx === multiselectHighlightedIndex) {
+      item.classList.add('active');
+      item.scrollIntoView({ block: 'nearest' });
+    } else {
+      item.classList.remove('active');
+    }
+  });
+}
+
+function initAtendioMultiSelect() {
+  const container = $('atendioContainer');
+  const box = $('atendioChipsBox');
+  const input = $('atendioSearchInput');
+  const dropdown = $('atendioDropdown');
+
+  if (!container || !box || !input || !dropdown) return;
+
+  input.addEventListener('focus', () => {
+    openAtendioDropdown(input.value);
+  });
+
+  input.addEventListener('input', () => {
+    openAtendioDropdown(input.value);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    const isDropdownOpen = !dropdown.classList.contains('hidden');
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isDropdownOpen) {
+        openAtendioDropdown(input.value);
+      } else if (currentFilteredPersonal.length > 0) {
+        const nextIndex = (multiselectHighlightedIndex + 1) % currentFilteredPersonal.length;
+        setHighlightedIndex(nextIndex);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (isDropdownOpen && currentFilteredPersonal.length > 0) {
+        const prevIndex = (multiselectHighlightedIndex - 1 + currentFilteredPersonal.length) % currentFilteredPersonal.length;
+        setHighlightedIndex(prevIndex);
+      }
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      if (isDropdownOpen && multiselectHighlightedIndex >= 0 && currentFilteredPersonal[multiselectHighlightedIndex]) {
+        e.preventDefault();
+        e.stopPropagation();
+        addPersonalChip(currentFilteredPersonal[multiselectHighlightedIndex].id);
+        return;
+      }
+      if (isDropdownOpen) {
+        e.preventDefault();
+      }
+      return;
+    }
+
+    if (e.key === 'Backspace' && input.value === '') {
+      if (selectedPersonalIds.length > 0) {
+        selectedPersonalIds.pop();
+        renderChips();
+        if (isDropdownOpen) {
+          openAtendioDropdown(input.value);
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      closeAtendioDropdown();
+      return;
+    }
+  });
+
+  box.addEventListener('click', (e) => {
+    if (e.target !== input && !e.target.closest('.multiselect-chip-remove')) {
+      input.focus();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!container.contains(e.target)) {
+      closeAtendioDropdown();
+    }
+  });
+}
+
 /* --------------------------------------------------------------------------
    Operaciones de Formulario (Guardar, Limpiar)
    -------------------------------------------------------------------------- */
@@ -500,6 +746,13 @@ function resetForm(preserveHelpers = true) {
   $('atendio').value = keptValues.atendio || '';
   if (keptValues.turno) $('turno').value = keptValues.turno;
 
+  // Restaurar chips de personal que atendió a partir de IDs preservados
+  selectedPersonalIds = (keptValues.atendio || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  renderChips();
+
   $('lat').value = '';
   $('lon').value = '';
   $('alt').value = '';
@@ -510,6 +763,7 @@ function resetForm(preserveHelpers = true) {
   drawDrops();
   updateGeoPreview();
 
+  editingEvidenciaId = null;
   $('formTitle').textContent = 'Nuevo Reporte de Evidencia';
   $('btnSave').textContent = 'Agregar reporte';
   $('btnCancel').classList.add('hidden');
@@ -553,8 +807,9 @@ $('form').onsubmit = async (e) => {
     finalAlt = parsed.alt;
   }
 
+  const isEditing = Boolean(editingEvidenciaId);
   const reportData = {
-    id: generateUUID(),
+    id: editingEvidenciaId || generateUUID(),
     lat: finalLat,
     lon: finalLon,
     alt: finalAlt,
@@ -565,16 +820,24 @@ $('form').onsubmit = async (e) => {
   FIELDS.forEach((field) => {
     reportData[field] = normalizeFinal($(field).value);
   });
+  // Guardar IDs exactos de los trabajadores seleccionados (sin mutaciones de texto)
+  reportData.atendio = $('atendio').value;
 
   try {
     // Guardar en la base de datos (SQLite / IndexedDB + carpetas organizadas por fecha)
     await saveEvidencia(reportData);
 
     // Notificación de éxito requerida
-    showToast('success', 'Evidencia agregada correctamente');
+    showToast('success', isEditing ? 'Evidencia actualizada correctamente' : 'Evidencia agregada correctamente');
 
-    resetForm(true);
-    $('folio').focus();
+    if (isEditing) {
+      setTimeout(() => {
+        window.location.href = 'registros.html';
+      }, 1000);
+    } else {
+      resetForm(true);
+      $('folio').focus();
+    }
   } catch (err) {
     console.error('Error al guardar evidencia:', err);
     // Notificación de error requerida
@@ -632,6 +895,84 @@ window.addEventListener('DOMContentLoaded', async () => {
   $('mElab').value = metaState.elab || '';
   $('mReviso').value = metaState.reviso || '';
 
+  // Cargar plantilla de personal para el multiselect
+  try {
+    allPersonal = await getAllPersonal();
+  } catch (err) {
+    console.warn('Error al cargar plantilla de personal:', err);
+    allPersonal = [];
+  }
+
+  initAtendioMultiSelect();
   resetForm(false);
   attachInputNormalizers(document);
+
+  // Carga para edición si proviene con parámetro ?edit=UUID
+  const params = new URLSearchParams(window.location.search);
+  const editId = params.get('edit');
+  if (editId) {
+    try {
+      const ev = await getEvidenciaById(editId);
+      if (ev) {
+        editingEvidenciaId = ev.id;
+        $('formTitle').textContent = 'Editar Reporte de Evidencia';
+        $('btnSave').textContent = 'Guardar cambios';
+        $('btnCancel').classList.remove('hidden');
+
+        if ($('folio')) $('folio').value = ev.folio || '';
+        if ($('fecha')) $('fecha').value = ev.fecha || today();
+        if ($('hora')) $('hora').value = ev.hora || '';
+        if ($('estatus')) $('estatus').value = ev.estatus || 'Atendido';
+        if ($('solicita')) $('solicita').value = ev.solicita || '';
+        if ($('turno')) $('turno').value = ev.turno || 'Matutino';
+        if ($('tipo')) $('tipo').value = ev.tipo || '';
+        if ($('ubicacion')) $('ubicacion').value = ev.ubicacion || '';
+        if ($('accion')) $('accion').value = ev.accion || '';
+        if ($('lat')) $('lat').value = ev.lat != null ? ev.lat : '';
+        if ($('lon')) $('lon').value = ev.lon != null ? ev.lon : '';
+        if ($('alt')) $('alt').value = ev.alt || '';
+        if ($('geoLink')) $('geoLink').value = ev.mapsUrl || '';
+
+        // Restaurar chips de personal que atendió
+        selectedPersonalIds = (ev.atendio || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        renderChips();
+
+        // Fotos
+        fotos = [ev.fotos?.[0] || null, ev.fotos?.[1] || null];
+        drawDrops();
+        updateGeoPreview();
+
+        showToast('success', 'Evidencia cargada para edición.');
+        return;
+      }
+    } catch (err) {
+      console.error('Error al cargar evidencia para edición:', err);
+    }
+  }
+
+  // Autollenado de campos si proviene de un reporte finalizado
+  const pFolio = params.get('folio');
+  const pTipo = params.get('tipo');
+  const pUbicacion = params.get('ubicacion');
+
+  if (pFolio || pTipo || pUbicacion) {
+    if (pFolio && $('folio')) $('folio').value = pFolio;
+    if (pTipo && $('tipo')) $('tipo').value = pTipo;
+    if (pUbicacion && $('ubicacion')) $('ubicacion').value = pUbicacion;
+    if ($('estatus')) $('estatus').value = 'Atendido';
+    showToast('success', 'Datos del reporte cargados para nueva evidencia.');
+  }
+
+  // Toggle de submenú Herramientas en barra lateral
+  $('btnToggleHerramientas')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const group = $('navGroupHerramientas');
+    if (group) {
+      const isOpen = group.classList.toggle('is-open');
+      $('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
+    }
+  });
 });

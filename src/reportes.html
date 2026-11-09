@@ -63,6 +63,57 @@
           </svg>
           <span>Evidencias</span>
         </a>
+
+        <a href="personal.html" class="sidebar-menu-item" id="navSidebarPersonal">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Personal</span>
+        </a>
+
+        <!-- Menú desplegable Herramientas -->
+        <div class="sidebar-dropdown-group" id="navGroupHerramientas">
+          <a href="herramientas.html" class="sidebar-menu-item sidebar-dropdown-toggle" id="btnToggleHerramientas"
+            aria-expanded="false">
+            <span class="sidebar-dropdown-label">
+              <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
+                </path>
+              </svg>
+              <span>Herramientas</span>
+            </span>
+            <svg class="sidebar-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </a>
+          <div class="sidebar-submenu" id="sidebarSubmenuHerramientas">
+            <a href="justificantes.html" class="sidebar-submenu-item" id="navSubJustificantes">
+              <span class="sidebar-submenu-bullet">•</span> Justificantes
+            </a>
+            <a href="dias-inhabiles.html" class="sidebar-submenu-item" id="navSubDiasInhabiles">
+              <span class="sidebar-submenu-bullet">•</span> Días inhábiles
+            </a>
+            <a href="bitacoras-gasolina.html" class="sidebar-submenu-item" id="navSubGasolina">
+              <span class="sidebar-submenu-bullet">•</span> Bitacoras de gasolina
+            </a>
+            <a href="comunidades-colonias.html" class="sidebar-submenu-item" id="navSubComunidades">
+              <span class="sidebar-submenu-bullet">•</span> Comunidades y Colonias
+            </a>
+            <a href="requi.html" class="sidebar-submenu-item" id="navSubRequi">
+              <span class="sidebar-submenu-bullet">•</span> REQUI
+            </a>
+            <a href="ajustes-combustible.html" class="sidebar-submenu-item" id="navSubCombustible">
+              <span class="sidebar-submenu-bullet">•</span> Ajustes de Combustible
+            </a>
+          </div>
+        </div>
       </nav>
     </aside>
 
@@ -112,7 +163,7 @@
 
             <label class="field col-1">
               <span class="field-label">Nombre del que atiende</span>
-              <input type="text" id="atendio" placeholder="Ej. Juan Pérez" class="field-input">
+              <input type="text" id="atendio" placeholder="" value="MIGUEL MÉNDEZ" class="field-input">
             </label>
 
             <label class="field col-1">
@@ -146,11 +197,11 @@
             <label class="field col-1" id="fieldTipoLampara">
               <span class="field-label">Tipo de lámpara</span>
               <select id="tipoLampara" class="field-select">
-                <option value="Blanca">Blanca</option>
-                <option value="Amarilla">Amarilla</option>
-                <option value="Led">Led</option>
-                <option value="Reflector">Reflector</option>
-                <option value="Otro">Otro</option>
+                <option value="Blanca">BLANCA</option>
+                <option value="Amarilla">AMARILLA</option>
+                <option value="Led">LED</option>
+                <option value="Reflector">REFLECTOR</option>
+                <option value="Otro">OTRO</option>
               </select>
             </label>
 
@@ -163,10 +214,10 @@
             <label class="field col-1" id="fieldTipoFalla">
               <span class="field-label">Tipo de falla</span>
               <select id="tipoFalla" class="field-select">
-                <option value="No prende">No prende</option>
-                <option value="Prende y apaga">Prende y apaga</option>
-                <option value="Circuito apagado">Circuito apagado</option>
-                <option value="Otro">Otro</option>
+                <option value="No prende">NO PRENDE</option>
+                <option value="Prende y apaga">PRENDE Y APAGA</option>
+                <option value="Circuito apagado">CIRCUITO APAGADO</option>
+                <option value="Otro">OTRO</option>
               </select>
             </label>
 
@@ -174,6 +225,23 @@
               <span class="field-label">Especificar tipo de falla <span class="required">*</span></span>
               <input type="text" id="otroFalla" placeholder="Ej. Cable caído, balastro quemado, etc."
                 class="field-input">
+            </label>
+
+            <!-- Estatus con activación de "Otro" -->
+            <label class="field col-1" id="fieldEstatus">
+              <span class="field-label">Estatus</span>
+              <select id="estatus" class="field-select">
+                <option value="En espera" selected>EN ESPERA</option>
+                <option value="Pendiente">PENDIENTE</option>
+                <option value="Urgente">URGENTE</option>
+                <option value="Otro">OTRO</option>
+                <option value="Atendido" id="optAtendido" hidden>Atendido</option>
+              </select>
+            </label>
+
+            <label class="field col-2 hidden" id="wrapOtroEstatus">
+              <span class="field-label">Especificar estatus <span class="required">*</span></span>
+              <input type="text" id="otroEstatus" placeholder="Ej. En revisión, Especial, etc." class="field-input">
             </label>
 
             <!-- Fila 4: Calles y Referencias -->

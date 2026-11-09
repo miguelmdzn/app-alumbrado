@@ -22,28 +22,37 @@ const TABLE = 'reportes';
 // Mapper: Normalización de datos para la base de datos
 // ---------------------------------------------------------------------------
 function normalizeEstatus(value) {
-  const v = String(value || '').trim().toLowerCase();
-  if (v === 'atendido' || v === 'atendida') return 'atendido';
-  return 'pendiente';
+  const v = String(value || '').trim();
+  if (!v) return 'En espera';
+  const lower = v.toLowerCase();
+  if (lower === 'atendido' || lower === 'atendida') return 'Atendido';
+  if (lower === 'en espera') return 'En espera';
+  if (lower === 'pendiente') return 'Pendiente';
+  if (lower === 'urgente') return 'Urgente';
+  const m = v.match(/^otro\s*\((.*)\)\s*$/i);
+  if (m) {
+    return `Otro(${m[1].trim()})`;
+  }
+  return v;
 }
 
 function toRecord(data, uuid) {
   return {
-    id:                uuid,
-    folio:             (data.folio || '').trim(),
-    fecha:             (data.fecha || '').trim(),
-    atendio:           (data.atendio || '').trim(),
-    usuario:           (data.usuario || '').trim(),
-    direccion:         (data.direccion || '').trim(),
+    id: uuid,
+    folio: (data.folio || '').trim(),
+    fecha: (data.fecha || '').trim(),
+    atendio: (data.atendio || '').trim(),
+    usuario: (data.usuario || '').trim(),
+    direccion: (data.direccion || '').trim(),
     colonia_comunidad: (data.colonia_comunidad || data.colonia || '').trim(),
-    telefono:          (data.telefono || '').trim(),
-    numero_lamparas:   parseInt(data.numero_lamparas || data.numeroLamparas, 10) || 1,
-    tipo_lampara:      (data.tipo_lampara || data.tipoLampara || '').trim(),
-    tipo_falla:        (data.tipo_falla || data.tipoFalla || '').trim(),
-    observaciones:     (data.observaciones || '').trim(),
-    referencias:       (data.referencias || '').trim(),
-    entre_calles:      (data.entre_calles || data.entreCalles || '').trim(),
-    estatus:           normalizeEstatus(data.estatus),
+    telefono: (data.telefono || '').trim(),
+    numero_lamparas: parseInt(data.numero_lamparas || data.numeroLamparas, 10) || 1,
+    tipo_lampara: (data.tipo_lampara || data.tipoLampara || '').trim(),
+    tipo_falla: (data.tipo_falla || data.tipoFalla || '').trim(),
+    observaciones: (data.observaciones || '').trim(),
+    referencias: (data.referencias || '').trim(),
+    entre_calles: (data.entre_calles || data.entreCalles || '').trim(),
+    estatus: normalizeEstatus(data.estatus),
   };
 }
 

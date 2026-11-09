@@ -13,6 +13,9 @@ import {
   initDatabase,
   getAllReportes,
   saveReporte,
+  syncOfficialHolidays,
+  getActiveHolidaysSet,
+  countBusinessDays,
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
@@ -45,14 +48,53 @@ const CHECK_ICON = `
   </svg>
 `;
 
-function estatusKey(value) {
+const EYE_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </svg>
+`;
+
+function isAtendido(value) {
   const v = String(value || '').trim().toLowerCase();
-  if (v === 'atendido' || v === 'atendida') return 'atendido';
-  return 'pendiente';
+  return v === 'atendido' || v === 'atendida';
 }
 
-function estatusLabel(value) {
-  return estatusKey(value) === 'atendido' ? 'Atendido' : 'Pendiente';
+function extractOtroEspec(value) {
+  const v = String(value || '').trim();
+  const m = v.match(/^Otro\s*\((.*)\)\s*$/i);
+  return m ? m[1].trim() : v;
+}
+
+function getStatusGroup(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (isAtendido(v)) return 'atendido';
+  if (v === 'en espera') return 'espera';
+  if (v === 'pendiente') return 'pendiente';
+  if (v === 'urgente') return 'urgente';
+  return 'otro';
+}
+
+function formatStatusLabel(value) {
+  const v = String(value || '').trim();
+  if (!v) return 'En espera';
+  const lower = v.toLowerCase();
+  if (lower === 'atendido' || lower === 'atendida') return 'Atendido';
+  if (lower === 'en espera') return 'En espera';
+  if (lower === 'pendiente') return 'Pendiente';
+  if (lower === 'urgente') return 'Urgente';
+  const m = v.match(/^Otro\s*\((.*)\)\s*$/i);
+  if (m) return `Otro(${m[1].trim()})`;
+  return v;
+}
+
+function getPriorityRank(estatus) {
+  const s = String(estatus || '').trim().toLowerCase();
+  if (isAtendido(s)) return 0;
+  if (s === 'en espera') return 1;    // Nivel más bajo
+  if (s === 'pendiente') return 2;    // Luego pendientes
+  if (s === 'urgente') return 3;      // Luego urgente
+  return 4;                           // Hasta arriba: los que digan otro (o personalizado)
 }
 
 function openAttendModal(id) {
@@ -61,8 +103,147 @@ function openAttendModal(id) {
 }
 
 function closeAttendModal() {
-  pendingAttendId = null;
   $('modalAtendido')?.classList.add('hidden');
+}
+
+function openOpcionesModal() {
+  $('modalOpcionesAtendido')?.classList.remove('hidden');
+}
+
+function closeOpcionesModal() {
+  pendingAttendId = null;
+  $('modalOpcionesAtendido')?.classList.add('hidden');
+}
+
+function openDetalleModal(id) {
+  const r = allReportes.find((item) => item.id === id);
+  if (!r) return;
+
+  const content = $('modalDetalleContent');
+  if (!content) return;
+
+  const statusGroup = getStatusGroup(r.estatus);
+  const statusLabel = formatStatusLabel(r.estatus);
+  const fechaFmt = fd(r.fecha) || '—';
+  const domParts = [];
+  if (r.direccion) domParts.push(r.direccion);
+  if (r.colonia_comunidad) domParts.push(`Col. ${r.colonia_comunidad}`);
+  const domicilio = domParts.join(', ') || '—';
+
+  content.innerHTML = `
+    <div class="detail-item">
+      <span class="detail-label">Folio</span>
+      <span class="detail-value"><strong>${esc(r.folio || 'S/F')}</strong></span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Estatus</span>
+      <span class="detail-value"><span class="badge-status badge-status-${statusGroup}">${esc(statusLabel)}</span></span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Fecha del reporte</span>
+      <span class="detail-value">${fechaFmt}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Personal que atendió</span>
+      <span class="detail-value">${esc(r.atendio || '—')}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Usuario / Solicitante</span>
+      <span class="detail-value"><strong>${esc(r.usuario || '—')}</strong></span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Teléfono de contacto</span>
+      <span class="detail-value">${esc(r.telefono || '—')}</span>
+    </div>
+    <div class="detail-item-full detail-item">
+      <span class="detail-label">Dirección y Colonia</span>
+      <span class="detail-value">${esc(domicilio)}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Entre qué calles</span>
+      <span class="detail-value">${esc(r.entre_calles || '—')}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Referencias</span>
+      <span class="detail-value">${esc(r.referencias || '—')}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Número de lámparas</span>
+      <span class="detail-value"><strong>${r.numero_lamparas || 1}</strong></span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Tipo de lámpara</span>
+      <span class="detail-value">${esc(r.tipo_lampara || '—')}</span>
+    </div>
+    <div class="detail-item-full detail-item">
+      <span class="detail-label">Tipo de falla</span>
+      <span class="detail-value">${esc(r.tipo_falla || '—')}</span>
+    </div>
+    <div class="detail-item-full detail-item">
+      <span class="detail-label">Observaciones</span>
+      <span class="detail-value">${esc(r.observaciones || '—')}</span>
+    </div>
+  `;
+
+  $('modalDetalleReporte')?.classList.remove('hidden');
+}
+
+function closeDetalleModal() {
+  $('modalDetalleReporte')?.classList.add('hidden');
+}
+
+function onConfirmAtendidoSi() {
+  closeAttendModal();
+  openOpcionesModal();
+}
+
+async function finalizarSoloTerminado() {
+  const id = pendingAttendId;
+  closeOpcionesModal();
+  if (!id) return;
+
+  const reporte = allReportes.find((r) => r.id === id);
+  if (!reporte) return;
+
+  try {
+    const saved = await saveReporte({ ...reporte, estatus: 'Atendido' });
+    const index = allReportes.findIndex((r) => r.id === id);
+    if (index >= 0) allReportes[index] = { ...allReportes[index], ...saved, estatus: 'Atendido' };
+    applyFilterAndRender();
+  } catch (err) {
+    console.error('Error al marcar reporte como atendido:', err);
+  }
+}
+
+async function finalizarYAnadirEvidencia() {
+  const id = pendingAttendId;
+  closeOpcionesModal();
+  if (!id) return;
+
+  const reporte = allReportes.find((r) => r.id === id);
+  if (!reporte) return;
+
+  try {
+    await saveReporte({ ...reporte, estatus: 'Atendido' });
+    const index = allReportes.findIndex((r) => r.id === id);
+    if (index >= 0) allReportes[index] = { ...allReportes[index], estatus: 'Atendido' };
+
+    const dirParts = [];
+    if (reporte.direccion) dirParts.push(reporte.direccion);
+    if (reporte.colonia_comunidad) dirParts.push(`Col. ${reporte.colonia_comunidad}`);
+    const ubicacion = dirParts.join(', ');
+    const tipo = reporte.tipo_falla || reporte.tipo_lampara || 'Falla de alumbrado';
+
+    const query = new URLSearchParams({
+      folio: reporte.folio || '',
+      tipo: tipo,
+      ubicacion: ubicacion
+    });
+
+    window.location.href = `index.html?${query.toString()}`;
+  } catch (err) {
+    console.error('Error al finalizar y redirigir a evidencia:', err);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -72,7 +253,7 @@ function renderTable(reportes) {
   const tbody = $('reportesTableBody');
   if (!tbody) return;
 
-  const filtro = $('filterEstatus')?.value || 'pendiente';
+  const filtro = $('filterEstatus')?.value || 'sin_atender';
 
   if (reportes.length === 0) {
     const hasQuery = ($('searchInput')?.value || '').trim();
@@ -80,7 +261,7 @@ function renderTable(reportes) {
       ? 'No se encontraron reportes con esa búsqueda.'
       : filtro === 'atendido'
         ? 'No se encontraron reportes atendidos.'
-        : 'No se encontraron reportes pendientes.';
+        : 'No se encontraron reportes sin atender.';
     tbody.innerHTML = `
       <tr>
         <td colspan="12" class="table-empty-row">
@@ -95,8 +276,9 @@ function renderTable(reportes) {
     const ubicacion = r.direccion || '—';
     const colonia = r.colonia_comunidad || '—';
     const fechaFmt = fd(r.fecha) || '—';
-    const status = estatusKey(r.estatus);
-    const checkBtn = status === 'pendiente'
+    const statusGroup = getStatusGroup(r.estatus);
+    const displayStatus = formatStatusLabel(r.estatus);
+    const checkBtn = !isAtendido(r.estatus)
       ? `<button type="button" class="btn-icon-action btn-icon-action-check" data-atender="${esc(r.id)}" title="Marcar como atendido" aria-label="Marcar como atendido">${CHECK_ICON}</button>`
       : '';
 
@@ -112,9 +294,10 @@ function renderTable(reportes) {
         <td class="td-center"><strong>${r.numero_lamparas || 1}</strong></td>
         <td><span class="badge-lampara">${esc(r.tipo_lampara || '—')}</span></td>
         <td><span class="badge-falla">${esc(r.tipo_falla || '—')}</span></td>
-        <td><span class="badge-status badge-status-${status}">${estatusLabel(r.estatus)}</span></td>
+        <td><span class="badge-status badge-status-${statusGroup}">${esc(displayStatus)}</span></td>
         <td class="td-center">
           <div class="table-actions">
+            <button type="button" class="btn-icon-action" data-detalle="${esc(r.id)}" title="Ver detalle del reporte" aria-label="Ver detalle del reporte">${EYE_ICON}</button>
             <a class="btn-icon-action" href="reportes.html?id=${encodeURIComponent(r.id)}" title="Editar reporte" aria-label="Editar reporte">${PENCIL_ICON}</a>
             ${checkBtn}
           </div>
@@ -123,23 +306,66 @@ function renderTable(reportes) {
     `;
   }).join('');
 
+  tbody.querySelectorAll('[data-detalle]').forEach((btn) => {
+    btn.onclick = () => openDetalleModal(btn.dataset.detalle);
+  });
+
   tbody.querySelectorAll('[data-atender]').forEach((btn) => {
     btn.onclick = () => openAttendModal(btn.dataset.atender);
   });
 }
 
 /* --------------------------------------------------------------------------
-   Cálculo de días transcurridos
+   Cálculo de días hábiles y actualización dinámica de estatus
+   - 0 a 4 días hábiles: "En espera"
+   - 5 a 9 días hábiles: "Pendiente"
+   - 10+ días hábiles:   "Urgente"
+   (Sin contar fines de semana ni días inhábiles oficiales/municipales activos)
    -------------------------------------------------------------------------- */
+let currentHolidaysSet = null;
+
 function getDaysAgo(dateStr, todayIso) {
   if (!dateStr) return 0;
+  if (currentHolidaysSet) {
+    return countBusinessDays(dateStr, todayIso, currentHolidaysSet);
+  }
   const parts = dateStr.split('-').map(Number);
   if (parts.length !== 3) return 0;
   const dOld = new Date(parts[0], parts[1] - 1, parts[2]);
   const todayParts = todayIso.split('-').map(Number);
   const dNow = new Date(todayParts[0], todayParts[1] - 1, todayParts[2]);
   const diffTime = dNow.getTime() - dOld.getTime();
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+}
+
+async function updateReportesStatusByBusinessDays(reportesList, todayIso, holidaysSet) {
+  for (const r of reportesList) {
+    const s = String(r.estatus || '').trim();
+    const lower = s.toLowerCase();
+    // No modificar si ya está atendido ni si es un estatus manual "Otro(...)"
+    if (lower === 'atendido' || lower === 'atendida' || lower.startsWith('otro')) {
+      continue;
+    }
+
+    const businessDays = countBusinessDays(r.fecha, todayIso, holidaysSet);
+    let targetStatus = 'En espera';
+    if (businessDays >= 10) {
+      targetStatus = 'Urgente';
+    } else if (businessDays >= 5) {
+      targetStatus = 'Pendiente';
+    } else {
+      targetStatus = 'En espera';
+    }
+
+    if (s !== targetStatus) {
+      r.estatus = targetStatus;
+      try {
+        await saveReporte(r);
+      } catch (err) {
+        console.warn('Error al actualizar estatus por días hábiles:', err);
+      }
+    }
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -158,19 +384,46 @@ function renderPrintDocument(reportes) {
     $('printDate').textContent = todayFmt;
   }
 
-  // Separar los reportes en:
-  // 1) Días anteriores (fecha < hoy)
-  // 2) Del día (fecha >= hoy o sin fecha)
+  // Separar los reportes en tablas por estatus e importancia:
+  // 1) Estatus "Otro" (aparece hasta arriba)
+  // 2) Estatus "Urgente" (arriba de los de días anteriores)
+  // 3) Días anteriores (Pendientes / En espera con fecha < hoy)
+  // 4) Del día (Pendientes / En espera generados hoy)
+  const reportesOtro = [];
+  const reportesUrgente = [];
   const anteriores = [];
   const delDia = [];
 
   reportes.forEach((r) => {
     const daysAgo = getDaysAgo(r.fecha, todayIso);
-    if (daysAgo > 0) {
-      anteriores.push({ ...r, _daysAgo: daysAgo });
+    const withDays = daysAgo > 0 ? { ...r, _daysAgo: daysAgo } : { ...r, _daysAgo: 0 };
+    const grp = getStatusGroup(r.estatus);
+
+    if (grp === 'otro') {
+      reportesOtro.push(withDays);
+    } else if (grp === 'urgente') {
+      reportesUrgente.push(withDays);
+    } else if (daysAgo > 0) {
+      anteriores.push(withDays);
     } else {
-      delDia.push(r);
+      delDia.push(withDays);
     }
+  });
+
+  // Ordenar "Otro": del más antiguo al más reciente
+  reportesOtro.sort((a, b) => {
+    const da = a.fecha || '9999-99-99';
+    const db = b.fecha || '9999-99-99';
+    if (da !== db) return da.localeCompare(db);
+    return (a.folio || '').localeCompare(b.folio || '');
+  });
+
+  // Ordenar "Urgentes": del más antiguo al más reciente
+  reportesUrgente.sort((a, b) => {
+    const da = a.fecha || '9999-99-99';
+    const db = b.fecha || '9999-99-99';
+    if (da !== db) return da.localeCompare(db);
+    return (a.folio || '').localeCompare(b.folio || '');
   });
 
   // Ordenar anteriores: del más antiguo al más reciente
@@ -181,18 +434,25 @@ function renderPrintDocument(reportes) {
     return (a.folio || '').localeCompare(b.folio || '');
   });
 
-  // Ordenar los del día por folio o ID
+  // Ordenar los del día por folio
   delDia.sort((a, b) => {
     return (a.folio || '').localeCompare(b.folio || '');
   });
 
   // Totales oficiales para el encabezado
   const total = reportes.length;
+  const totalOtro = reportesOtro.length;
+  const totalUrgente = reportesUrgente.length;
   const totalAnteriores = anteriores.length;
   const totalDelDia = delDia.length;
 
   if ($('printTotalSummary')) {
-    $('printTotalSummary').textContent = `Total: ${total} reportes (${totalAnteriores} de días anteriores, ${totalDelDia} del día)`;
+    const parts = [];
+    if (totalOtro > 0) parts.push(`${totalOtro} otro`);
+    if (totalUrgente > 0) parts.push(`${totalUrgente} urgentes`);
+    if (totalAnteriores > 0) parts.push(`${totalAnteriores} de días anteriores`);
+    if (totalDelDia > 0 || parts.length === 0) parts.push(`${totalDelDia} del día`);
+    $('printTotalSummary').textContent = `Total: ${total} reportes (${parts.join(', ')})`;
   }
 
   // Contadores de la tabla en pantalla
@@ -258,8 +518,19 @@ function renderPrintDocument(reportes) {
       ? `<div class="print-fecha-val">${fechaFmt}</div><div class="print-ago-text">hace ${r._daysAgo} ${r._daysAgo === 1 ? 'día' : 'días'}</div>`
       : `<div class="print-fecha-val">${fechaFmt}</div>`;
 
+    const obsText = (r.observaciones || '').trim();
+    const obsRow = obsText
+      ? `
+        <tr class="print-row-observaciones ${isAnterior ? 'print-row-anterior' : 'print-row-dia'}">
+          <td colspan="6" class="col-observaciones">
+            <span class="print-obs-label">Observaciones:</span> <span class="print-obs-text">${esc(obsText)}</span>
+          </td>
+        </tr>
+      `
+      : '';
+
     return `
-      <tr class="${isAnterior ? 'print-row-anterior' : 'print-row-dia'}">
+      <tr class="${isAnterior ? 'print-row-anterior' : 'print-row-dia'} ${obsText ? 'has-observaciones' : ''}">
         <td class="col-folio">${esc(r.folio || 'S/F')}</td>
         <td class="col-fecha">${fechaCellHtml}</td>
         <td class="col-solicitante">
@@ -279,17 +550,64 @@ function renderPrintDocument(reportes) {
           <div class="print-sub-text">${esc(refText)}</div>
         </td>
       </tr>
+      ${obsRow}
     `;
   };
 
   let sectionsHtml = '';
 
-  const viendoAtendidos = ($('filterEstatus')?.value || 'pendiente') === 'atendido';
-  const tituloAnteriores = viendoAtendidos
-    ? `ATENDIDOS DE DÍAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'reporte' : 'reportes'}, del más antiguo al más reciente)`
-    : `PENDIENTES DE DÍAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'reporte' : 'reportes'}, del más antiguo al más reciente) - ATENCIÓN PRIORITARIA`;
+  // 1. Sección: OTRO (se agrupa y muestra el texto del nuevo input como título)
+  if (reportesOtro.length > 0) {
+    const gruposOtro = new Map();
+    reportesOtro.forEach((r) => {
+      const espec = extractOtroEspec(r.estatus) || 'OTRO';
+      if (!gruposOtro.has(espec)) {
+        gruposOtro.set(espec, []);
+      }
+      gruposOtro.get(espec).push(r);
+    });
 
-  // 1. Sección: días anteriores
+    gruposOtro.forEach((lista, espec) => {
+      const tituloEspec = espec.toUpperCase();
+      sectionsHtml += `
+        <div class="print-section print-section-otro">
+          <div class="print-section-header-dark">
+            ${esc(tituloEspec)} (${lista.length} ${lista.length === 1 ? 'REPORTE' : 'REPORTES'})
+          </div>
+          <table class="print-reports-table">
+            ${theadHtml}
+            <tbody>
+              ${lista.map((r) => renderPrintRow(r, r._daysAgo > 0)).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    });
+  }
+
+  // 2. Sección: URGENTES (arriba de los de días anteriores)
+  if (reportesUrgente.length > 0) {
+    sectionsHtml += `
+      <div class="print-section print-section-urgente">
+        <div class="print-section-header-dark">
+          URGENTES (${reportesUrgente.length} ${reportesUrgente.length === 1 ? 'REPORTE' : 'REPORTES'})
+        </div>
+        <table class="print-reports-table">
+          ${theadHtml}
+          <tbody>
+            ${reportesUrgente.map((r) => renderPrintRow(r, r._daysAgo > 0)).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // 3. Sección: PENDIENTES DE DÍAS ANTERIORES
+  const viendoAtendidos = ($('filterEstatus')?.value || 'sin_atender') === 'atendido';
+  const tituloAnteriores = viendoAtendidos
+    ? `ATENDIDOS DE DÍAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'REPORTE' : 'REPORTES'}, DEL MÁS ANTIGUO AL MÁS RECIENTE)`
+    : `PENDIENTES DE DÍAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'REPORTE' : 'REPORTES'}, DEL MÁS ANTIGUO AL MÁS RECIENTE) - ATENCIÓN PRIORITARIA`;
+
   if (anteriores.length > 0) {
     sectionsHtml += `
       <div class="print-section print-section-anteriores">
@@ -306,12 +624,12 @@ function renderPrintDocument(reportes) {
     `;
   }
 
-  // 2. Sección: REPORTES DEL DÍA
-  if (delDia.length > 0 || anteriores.length === 0) {
+  // 4. Sección: REPORTES DEL DÍA
+  if (delDia.length > 0 || (reportesOtro.length === 0 && reportesUrgente.length === 0 && anteriores.length === 0)) {
     sectionsHtml += `
       <div class="print-section print-section-dia">
         <div class="print-section-header-gray">
-          REPORTES DEL DÍA ${todayFmt} (${delDia.length} ${delDia.length === 1 ? 'reporte' : 'reportes'})
+          REPORTES DEL DÍA ${todayFmt} (${delDia.length} ${delDia.length === 1 ? 'REPORTE' : 'REPORTES'})
         </div>
         <table class="print-reports-table">
           ${theadHtml}
@@ -334,39 +652,27 @@ function renderPrintDocument(reportes) {
    -------------------------------------------------------------------------- */
 function applyFilterAndRender() {
   const query = ($('searchInput')?.value || '').trim().toLowerCase();
-  const filtro = $('filterEstatus')?.value || 'pendiente';
+  const filtro = $('filterEstatus')?.value || 'sin_atender';
 
-  let filtered = allReportes.filter((r) => estatusKey(r.estatus) === filtro);
+  let filtered = allReportes.filter((r) => {
+    const atendido = isAtendido(r.estatus);
+    if (filtro === 'atendido') return atendido;
+    return !atendido;
+  });
+
   if (query) {
     filtered = filtered.filter((r) => {
       return [
         r.folio, r.usuario, r.atendio, r.direccion,
         r.colonia_comunidad, r.tipo_falla, r.tipo_lampara,
-        r.referencias, r.entre_calles, r.observaciones, r.telefono
+        r.referencias, r.entre_calles, r.observaciones, r.telefono,
+        r.estatus
       ].some((v) => (v || '').toLowerCase().includes(query));
     });
   }
 
   renderTable(filtered);
   renderPrintDocument(filtered);
-}
-
-async function confirmMarcarAtendido() {
-  const id = pendingAttendId;
-  if (!id) return;
-
-  const reporte = allReportes.find((r) => r.id === id);
-  closeAttendModal();
-  if (!reporte) return;
-
-  try {
-    const saved = await saveReporte({ ...reporte, estatus: 'atendido' });
-    const index = allReportes.findIndex((r) => r.id === id);
-    if (index >= 0) allReportes[index] = { ...allReportes[index], ...saved, estatus: 'atendido' };
-    applyFilterAndRender();
-  } catch (err) {
-    console.error('Error al marcar reporte como atendido:', err);
-  }
 }
 
 /* --------------------------------------------------------------------------
@@ -379,8 +685,28 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('Error al conectar base de datos:', err);
   }
 
+  const hoy = new Date();
+  hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
+  const todayIso = hoy.toISOString().slice(0, 10);
+
+  // Sincronizar días festivos oficiales y asuetos municipales en BD
+  try {
+    await syncOfficialHolidays();
+  } catch (err) {
+    console.warn('Error al sincronizar días oficiales:', err);
+  }
+
+  try {
+    currentHolidaysSet = await getActiveHolidaysSet();
+  } catch (err) {
+    console.warn('Error al obtener días festivos activos:', err);
+    currentHolidaysSet = new Set();
+  }
+
   try {
     allReportes = await getAllReportes();
+    // Actualizar automáticamente estatus según días hábiles transcurridos
+    await updateReportesStatusByBusinessDays(allReportes, todayIso, currentHolidaysSet);
   } catch (err) {
     console.error('Error al cargar reportes:', err);
     allReportes = [];
@@ -400,17 +726,42 @@ window.addEventListener('DOMContentLoaded', async () => {
   $('filterEstatus')?.addEventListener('change', applyFilterAndRender);
 
   $('modalAtendidoNo')?.addEventListener('click', closeAttendModal);
-  $('modalAtendidoSi')?.addEventListener('click', confirmMarcarAtendido);
+  $('modalAtendidoSi')?.addEventListener('click', onConfirmAtendidoSi);
+  $('btnSoloTerminado')?.addEventListener('click', finalizarSoloTerminado);
+  $('btnAnadirEvidencia')?.addEventListener('click', finalizarYAnadirEvidencia);
+
+  $('btnCerrarDetalle')?.addEventListener('click', closeDetalleModal);
+  $('btnCerrarDetalleX')?.addEventListener('click', closeDetalleModal);
+
   $('modalAtendido')?.addEventListener('click', (e) => {
     if (e.target === $('modalAtendido')) closeAttendModal();
   });
+  $('modalOpcionesAtendido')?.addEventListener('click', (e) => {
+    if (e.target === $('modalOpcionesAtendido')) closeOpcionesModal();
+  });
+  $('modalDetalleReporte')?.addEventListener('click', (e) => {
+    if (e.target === $('modalDetalleReporte')) closeDetalleModal();
+  });
+
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('modalAtendido')?.classList.contains('hidden')) {
-      closeAttendModal();
+    if (e.key === 'Escape') {
+      if (!$('modalAtendido')?.classList.contains('hidden')) closeAttendModal();
+      if (!$('modalOpcionesAtendido')?.classList.contains('hidden')) closeOpcionesModal();
+      if (!$('modalDetalleReporte')?.classList.contains('hidden')) closeDetalleModal();
     }
   });
 
   $('btnExportPdf')?.addEventListener('click', () => {
     window.print();
+  });
+
+  // Toggle de submenú Herramientas en barra lateral
+  $('btnToggleHerramientas')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const group = $('navGroupHerramientas');
+    if (group) {
+      const isOpen = group.classList.toggle('is-open');
+      $('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
+    }
   });
 });
