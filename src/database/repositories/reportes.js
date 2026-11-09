@@ -13,6 +13,7 @@ import {
   idbPut,
   idbGetAll,
   idbDelete,
+  idbClear,
   generateUUID,
 } from '../core.js';
 
@@ -111,30 +112,33 @@ export async function saveReporte(reportData) {
  * Obtiene todos los reportes ordenados cronológicamente
  */
 export async function getAllReportes() {
-  let rows = [];
-
-  // 1. Intentar desde SQLite
+  // 1. Intentar desde SQLite (fuente autoritativa en Tauri)
   if (isSQLiteReady()) {
     try {
-      rows = await getSQLite().select(
+      const rows = await getSQLite().select(
         `SELECT * FROM ${TABLE}
          ORDER BY fecha DESC, created_at DESC;`
       );
+      if (Array.isArray(rows)) {
+        if (rows.length === 0) {
+          // Si la tabla fue limpiada en SQLite, limpiamos también la caché de IndexedDB
+          await idbClear(TABLE);
+        }
+        return rows;
+      }
     } catch (err) {
       console.error(`[reportes] Error al consultar SQLite:`, err);
     }
   }
 
-  // 2. Fallback IndexedDB
-  if (!rows || rows.length === 0) {
-    rows = await idbGetAll(TABLE);
-    if (rows && rows.length > 0) {
-      rows.sort((a, b) => {
-        const ka = (b.fecha || '') + (b.created_at || '');
-        const kb = (a.fecha || '') + (a.created_at || '');
-        return ka.localeCompare(kb);
-      });
-    }
+  // 2. Fallback IndexedDB SOLO si SQLite no está listo o falló la conexión
+  const rows = await idbGetAll(TABLE);
+  if (rows && rows.length > 0) {
+    rows.sort((a, b) => {
+      const ka = (b.fecha || '') + (b.created_at || '');
+      const kb = (a.fecha || '') + (a.created_at || '');
+      return ka.localeCompare(kb);
+    });
   }
 
   return rows || [];

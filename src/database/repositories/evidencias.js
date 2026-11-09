@@ -158,26 +158,33 @@ export async function saveEvidencia(report) {
  * Devuelve todos los registros, obteniendo la referencia de la BD y cargando la imagen desde disco
  */
 export async function getAllEvidencias() {
-  let rows = [];
+  let rows = null;
 
-  // 1. Intentar desde SQLite
+  // 1. Intentar desde SQLite (fuente autoritativa en Tauri)
   if (isSQLiteReady()) {
     try {
-      rows = await getSQLite().select(
+      const result = await getSQLite().select(
         `SELECT * FROM ${TABLE}
          ORDER BY fecha_atencion ASC, hora_atencion ASC, created_at ASC;`
       );
+      if (Array.isArray(result)) {
+        rows = result;
+        if (rows.length === 0) {
+          // Si la tabla fue limpiada en SQLite, limpiamos también la caché de IndexedDB
+          await idbClear(TABLE);
+        }
+      }
     } catch (err) {
       console.error(`[evidencias] SQLite getAll error:`, err);
     }
   }
 
-  // 2. Fallback IndexedDB
-  if (!rows || rows.length === 0) {
+  // 2. Fallback IndexedDB SOLO si SQLite no estuvo disponible o falló la conexión
+  if (rows === null) {
     rows = await idbGetAll(TABLE);
   }
 
-  const items = rows.map(toFrontend);
+  const items = (rows || []).map(toFrontend);
 
   // 3. Resolver y cargar cada imagen desde su carpeta en disco
   for (const item of items) {

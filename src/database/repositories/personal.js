@@ -14,6 +14,7 @@ import {
   idbPut,
   idbGetAll,
   idbDelete,
+  idbClear,
   generateUUID,
 } from '../core.js';
 
@@ -97,34 +98,36 @@ export async function savePersonal(personalData) {
  * Obtiene todo el personal registrado ordenado por nombre
  */
 export async function getAllPersonal() {
-  let rows = [];
-
-  // 1. Intentar desde SQLite
+  // 1. Intentar desde SQLite (fuente autoritativa en Tauri)
   if (isSQLiteReady()) {
     try {
-      rows = await getSQLite().select(
+      const rows = await getSQLite().select(
         `SELECT * FROM ${TABLE}
          ORDER BY CASE WHEN estatus = 'Activo' THEN 0 ELSE 1 END,
                   nombres ASC, apellido1 ASC, created_at DESC;`
       );
+      if (Array.isArray(rows)) {
+        if (rows.length === 0) {
+          await idbClear(TABLE);
+        }
+        return rows;
+      }
     } catch (err) {
       console.error(`[personal] Error al consultar SQLite:`, err);
     }
   }
 
-  // 2. Fallback IndexedDB
-  if (!rows || rows.length === 0) {
-    rows = await idbGetAll(TABLE);
-    if (rows && rows.length > 0) {
-      rows.sort((a, b) => {
-        const ea = (a.estatus || 'Activo') === 'Activo' ? 0 : 1;
-        const eb = (b.estatus || 'Activo') === 'Activo' ? 0 : 1;
-        if (ea !== eb) return ea - eb;
-        const na = getFullName(a);
-        const nb = getFullName(b);
-        return na.localeCompare(nb);
-      });
-    }
+  // 2. Fallback IndexedDB SOLO si SQLite no está disponible o falló la conexión
+  const rows = await idbGetAll(TABLE);
+  if (rows && rows.length > 0) {
+    rows.sort((a, b) => {
+      const ea = (a.estatus || 'Activo') === 'Activo' ? 0 : 1;
+      const eb = (b.estatus || 'Activo') === 'Activo' ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      const na = getFullName(a);
+      const nb = getFullName(b);
+      return na.localeCompare(nb);
+    });
   }
 
   return rows || [];

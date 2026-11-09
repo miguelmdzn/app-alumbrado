@@ -127,7 +127,7 @@ function openDetalleModal(id) {
   const fechaFmt = fd(r.fecha) || '—';
   const domParts = [];
   if (r.direccion) domParts.push(r.direccion);
-  if (r.colonia_comunidad) domParts.push(`Col. ${r.colonia_comunidad}`);
+  if (r.colonia_comunidad) domParts.push(`${r.colonia_comunidad}`);
   const domicilio = domParts.join(', ') || '—';
 
   content.innerHTML = `
@@ -230,7 +230,7 @@ async function finalizarYAnadirEvidencia() {
 
     const dirParts = [];
     if (reporte.direccion) dirParts.push(reporte.direccion);
-    if (reporte.colonia_comunidad) dirParts.push(`Col. ${reporte.colonia_comunidad}`);
+    if (reporte.colonia_comunidad) dirParts.push(`${reporte.colonia_comunidad}`);
     const ubicacion = dirParts.join(', ');
     const tipo = reporte.tipo_falla || reporte.tipo_lampara || 'Falla de alumbrado';
 
@@ -486,7 +486,7 @@ function renderPrintDocument(reportes) {
     // Domicilio completo y Entre calles
     const domParts = [];
     if (r.direccion) domParts.push(r.direccion);
-    if (r.colonia_comunidad) domParts.push(`Col. ${r.colonia_comunidad}`);
+    if (r.colonia_comunidad) domParts.push(`${r.colonia_comunidad}`);
     const domicilio = domParts.join(', ') || '—';
 
     let entreCalles = r.entre_calles ? r.entre_calles.trim() : '';
@@ -635,9 +635,9 @@ function renderPrintDocument(reportes) {
           ${theadHtml}
           <tbody>
             ${delDia.length > 0
-              ? delDia.map((r) => renderPrintRow(r, false)).join('')
-              : `<tr><td colspan="6" class="print-empty-row">No hay reportes registrados generados el día de hoy.</td></tr>`
-            }
+        ? delDia.map((r) => renderPrintRow(r, false)).join('')
+        : `<tr><td colspan="6" class="print-empty-row">No hay reportes registrados generados el día de hoy.</td></tr>`
+      }
           </tbody>
         </table>
       </div>
