@@ -23,6 +23,12 @@ import {
 } from './normalizer.js';
 
 import {
+  enqueueRecord,
+  processSyncQueue,
+  getPendingItems,
+} from './database/repositories/syncQueue.js';
+
+import {
   syncPersonalToGoogleSheet,
   getSheetsConfig,
   saveSheetsConfig,
@@ -306,24 +312,25 @@ $('formPersonal')?.addEventListener('submit', async (e) => {
     } else {
       allPersonal.unshift(saved);
       showToast('success', 'Trabajador guardado en la base de datos.');
+    }
 
-      // Sincronización automática con Google Sheets (Hoja 3: PERSONAL desde A3)
-      syncPersonalToGoogleSheet(saved)
+    // Encolar de forma segura en SQLite (actualiza payload más reciente si ya estaba en cola)
+    try {
+      await enqueueRecord('personal', saved.id, saved);
+      // Disparar sincronización con Google Apps Script en segundo plano
+      processSyncQueue('personal')
         .then((syncRes) => {
-          if (syncRes.success) {
-            showToast('success', `Trabajador guardado y sincronizado en Google Sheets (${syncRes.range || 'Hoja 3'})`);
-          } else if (syncRes.reason === 'missing_id') {
-            console.info('[Google Sheets] Hoja no configurada aún.');
-          } else if (syncRes.reason === 'unauthorized') {
-            console.warn('[Google Sheets] Conecta tu cuenta en el botón de Google Sheets.');
-          } else {
-            console.warn('[Google Sheets] Error al sincronizar:', syncRes.error);
-            showToast('error', `Guardado local OK, pero falló en Sheets: ${syncRes.error}`);
+          if (syncRes.synced > 0) {
+            showToast('success', 'Registro sincronizado con Google Sheets (Hoja PERSONAL).');
+          } else if (syncRes.failed > 0) {
+            console.info('[SyncQueue] Registro pendiente de sincronización en cola local.');
           }
         })
         .catch((err) => {
-          console.error('[Google Sheets] Error en sincronización:', err);
+          console.warn('[SyncQueue] Sincronización pendiente:', err);
         });
+    } catch (queueErr) {
+      console.warn('[SyncQueue] Error al encolar registro:', queueErr);
     }
 
     closeModalPersonal();
@@ -340,11 +347,15 @@ $('formPersonal')?.addEventListener('submit', async (e) => {
 async function updateSheetsUI() {
   const badge = $('badgeSheetsConnection');
   const inputUrl = $('inputGasUrl');
+  const queueStatus = $('syncQueueStatus');
+
+  let isConfigured = false;
 
   if (window.__TAURI__?.core?.invoke) {
     try {
       const status = await window.__TAURI__.core.invoke('get_gas_config_status');
       if (status && status.is_configured) {
+        isConfigured = true;
         if (badge) {
           badge.textContent = 'Configurado';
           badge.className = 'badge-status badge-tipo-oficial';
@@ -352,16 +363,31 @@ async function updateSheetsUI() {
         if (inputUrl && !inputUrl.value && status.endpoint_url) {
           inputUrl.placeholder = status.endpoint_url;
         }
-        return;
       }
     } catch (e) {
       console.warn('Error al leer estado de Google Apps Script:', e);
     }
   }
 
-  if (badge) {
+  if (!isConfigured && badge) {
     badge.textContent = 'No configurado';
     badge.className = 'badge-status badge-status-inactivo';
+  }
+
+  // Comprobar registros pendientes en la cola local
+  try {
+    const pendings = await getPendingItems();
+    if (queueStatus) {
+      if (pendings && pendings.length > 0) {
+        queueStatus.style.display = 'block';
+        queueStatus.innerHTML = `⚠️ <strong>${pendings.length}</strong> registro(s) pendiente(s) de sincronizar con Google Sheets.`;
+      } else {
+        queueStatus.style.display = 'block';
+        queueStatus.innerHTML = `✅ Todos los registros locales están sincronizados.`;
+      }
+    }
+  } catch {
+    if (queueStatus) queueStatus.style.display = 'none';
   }
 }
 
@@ -430,122 +456,100 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (e.target === $('modalGoogleSheets')) closeModalGoogleSheets();
   });
 
-  // 1. Iniciar sesión Google
-  $('btnAbrirGoogleAuth')?.addEventListener('click', async () => {
-    const authUrl = generateAuthUrl();
-    const ok = await openExternalUrl(authUrl);
-    if (!ok) {
-      showToast('error', 'No se pudo abrir el navegador automáticamente. Usa el botón "Copiar enlace".');
-      const notice = $('authUrlNotice');
-      if (notice) notice.style.display = 'block';
-    }
-  });
+  // Guardar configuración de Google Apps Script en Rust (Credential Manager)
+  $('btnGuardarGasConfig')?.addEventListener('click', async () => {
+    const url = $('inputGasUrl')?.value?.trim();
+    const token = $('inputGasToken')?.value?.trim();
 
-  // Copiar enlace al portapapeles
-  $('btnCopiarAuthUrl')?.addEventListener('click', async () => {
-    const authUrl = generateAuthUrl();
-    try {
-      await navigator.clipboard.writeText(authUrl);
-      showToast('success', 'Enlace de Google copiado al portapapeles.');
-    } catch {
-      // Fallback para portapapeles
-      const ta = document.createElement('textarea');
-      ta.value = authUrl;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      showToast('success', 'Enlace de Google copiado al portapapeles.');
+    if (!url) {
+      showToast('error', 'Por favor ingresa la URL de la aplicación web de Google Apps Script.');
+      return;
     }
-    const notice = $('authUrlNotice');
-    if (notice) notice.style.display = 'block';
-  });
-
-  // Auto-limpieza al pegar URL en el campo de código
-  $('inputAuthCode')?.addEventListener('input', () => {
-    const val = $('inputAuthCode').value.trim();
-    if (val.toLowerCase().includes('code=')) {   // ← case-insensitive
-      const extracted = parseAuthCode(val);
-      if (extracted && extracted !== val) {
-        $('inputAuthCode').value = extracted;
-      }
-    }
-  });
-
-  // 2. Canjear código de autorización
-  let isConnecting = false;
-  $('btnCanjearCode')?.addEventListener('click', async () => {
-    if (isConnecting) return;
-    const btn = $('btnCanjearCode');
-    const code = $('inputAuthCode')?.value?.trim();
-    if (!code) {
-      showToast('error', 'Por favor ingresa la URL o el código de autorización.');
+    if (!token) {
+      showToast('error', 'Por favor ingresa el Token Secreto.');
       return;
     }
 
-    isConnecting = true;
+    try {
+      await window.__TAURI__.core.invoke('save_gas_config', {
+        endpointUrl: url,
+        secretToken: token,
+        endpoint_url: url,
+        secret_token: token,
+      });
+      if ($('inputGasToken')) $('inputGasToken').value = '';
+      showToast('success', 'Credenciales guardadas de forma segura en Windows.');
+      await updateSheetsUI();
+    } catch (err) {
+      console.error('Error al guardar credenciales:', err);
+      showToast('error', `Error al guardar: ${err}`);
+    }
+  });
+
+  // Probar conexión HTTP desde Rust hacia Google Apps Script
+  $('btnProbarConexionGas')?.addEventListener('click', async () => {
+    const btn = $('btnProbarConexionGas');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Conectando...';
+      btn.textContent = 'Probando conexión...';
     }
 
     try {
-      showToast('success', 'Conectando con Google...');
-      await exchangeCodeForTokens(code);
-      if ($('inputAuthCode')) $('inputAuthCode').value = '';
-      updateSheetsUI();
-      showToast('success', '¡Conexión exitosa con tu cuenta de Google!');
+      showToast('success', 'Verificando comunicación desde Rust con Google Apps Script...');
+      const res = await window.__TAURI__.core.invoke('test_gas_connection');
+      console.info('[GAS Test] Respuesta del Web App:', res);
+      showToast('success', '¡Conexión HTTP exitosa con Google Apps Script!');
+      await updateSheetsUI();
     } catch (err) {
-      console.error('Error al conectar Google:', err);
-      showToast('error', `Error al autenticar: ${err.message}`);
+      console.error('[GAS Test] Falló la prueba:', err);
+      showToast('error', `Prueba fallida: ${err}`);
     } finally {
-      isConnecting = false;
       if (btn) {
         btn.disabled = false;
-        btn.textContent = '2. Conectar';
+        btn.textContent = 'Probar Conexión';
       }
     }
   });
 
-  // 3. Guardar ID de hoja
-  $('btnGuardarSheetsConfig')?.addEventListener('click', () => {
-    let val = $('inputSpreadsheetId')?.value?.trim() || '';
-    const match = val.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    if (match) val = match[1];
-
-    saveSheetsConfig({ spreadsheetId: val, sheetName: '' });
-    showToast('success', 'ID de la hoja de Google guardado correctamente.');
-    updateSheetsUI();
-  });
-
-  // 4. Inserción de prueba
-  $('btnTestSheetsSync')?.addEventListener('click', async () => {
-    const cfg = getSheetsConfig();
-    if (!cfg.spreadsheetId) {
-      showToast('error', 'Primero ingresa y guarda el ID o enlace de la hoja de cálculo.');
-      return;
+  // Sincronizar registros pendientes manualmente
+  $('btnSincronizarPendientes')?.addEventListener('click', async () => {
+    const btn = $('btnSincronizarPendientes');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Sincronizando...';
     }
-    const sample = {
-      id: 'TEST-' + Math.floor(1000 + Math.random() * 9000),
-      nombres: 'Prueba de Conexión',
-      apellido1: 'Alumbrado',
-      apellido2: 'Público',
-      cargo: 'Técnico de Pruebas',
-      numero_trabajador: 'PR-001',
-      numero_checador_digital: '9999',
-      estatus: 'Activo',
-    };
-    showToast('success', 'Enviando registro de prueba a Google Sheets...');
+
     try {
-      const res = await syncPersonalToGoogleSheet(sample);
-      if (res.success) {
-        showToast('success', `¡Prueba exitosa! Insertado en: ${res.range}`);
+      showToast('success', 'Procesando cola de sincronización...');
+      const res = await processSyncQueue();
+      if (res.reason === 'not_configured') {
+        showToast('error', 'Primero configura y guarda la URL y el Token Secreto.');
+      } else if (res.total === 0) {
+        showToast('success', 'No hay registros pendientes en la cola.');
       } else {
-        showToast('error', `Falló inserción: ${res.error || res.reason}`);
+        showToast('success', `Sincronización: ${res.synced} enviado(s), ${res.failed} pendiente(s).`);
       }
+      await updateSheetsUI();
     } catch (err) {
-      showToast('error', `Error: ${err.message}`);
+      console.error('Error al sincronizar pendientes:', err);
+      showToast('error', `Error al sincronizar: ${err}`);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Sincronizar Pendientes';
+      }
     }
+  });
+
+  // Reintento automático cuando regresa la conexión a Internet
+  window.addEventListener('online', () => {
+    console.info('[SyncQueue] Conexión a internet restaurada. Procesando cola...');
+    processSyncQueue().then((res) => {
+      if (res.synced > 0) {
+        showToast('success', `Conexión restaurada: ${res.synced} registro(s) sincronizado(s) en Google Sheets.`);
+        updateSheetsUI();
+      }
+    }).catch(() => {});
   });
 
   // Toggle de submenú Herramientas en barra lateral

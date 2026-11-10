@@ -89,3 +89,13 @@ export {
   countBusinessDays,
   getOfficialMexicanHolidays,
 } from './database/repositories/diasInhabiles.js';
+
+// ---- Repositorio: localidades (colonias y comunidades del municipio) --------
+export {
+  getAllLocalidades,
+  searchLocalidades,
+  saveLocalidad,
+  updateLocalidad,
+  deleteLocalidad,
+  findOrCreateLocalidad,
+} from './database/repositories/localidades.js';

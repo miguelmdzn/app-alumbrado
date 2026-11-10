@@ -329,78 +329,116 @@ fn open_external_url(url: String) -> Result<(), String> {
 // INTEGRACIÓN GOOGLE APPS SCRIPT (COMANDOS SEGUROS DESDE EL BACKEND RUST)
 // ============================================================================
 
-const KEYRING_SERVICE: &str = "app_alumbrado_publico_gas";
-const KEYRING_URL_KEY: &str = "endpoint_url";
-const KEYRING_TOKEN_KEY: &str = "secret_token";
+fn get_gas_credentials_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    if !app_data.exists() {
+        fs::create_dir_all(&app_data).map_err(|e| e.to_string())?;
+    }
+    Ok(app_data.join("gas_credentials.dat"))
+}
 
-/// Guarda de forma segura la URL y el Token en el Administrador de Credenciales del SO
+const CIPHER_KEY: &[u8] = b"AlumbradoPublico_GAS_Credential_Key_2026_Xk9";
+
+fn obfuscate(data: &[u8]) -> Vec<u8> {
+    data.iter()
+        .enumerate()
+        .map(|(i, b)| b ^ CIPHER_KEY[i % CIPHER_KEY.len()])
+        .collect()
+}
+
+fn internal_save_credentials(app: &tauri::AppHandle, url: &str, token: &str) -> Result<(), String> {
+    let file = get_gas_credentials_file(app)?;
+    let payload = serde_json::json!({
+        "url": url,
+        "token": token
+    });
+    let raw = serde_json::to_vec(&payload).map_err(|e| e.to_string())?;
+    let enc = obfuscate(&raw);
+    fs::write(&file, enc).map_err(|e| format!("Error guardando credenciales seguras: {}", e))?;
+    Ok(())
+}
+
+fn internal_load_credentials(app: &tauri::AppHandle) -> Result<(String, String), String> {
+    let file = get_gas_credentials_file(app)?;
+    if !file.exists() {
+        return Err("La URL de Google Apps Script no está configurada.".to_string());
+    }
+    let enc = fs::read(&file).map_err(|e| format!("Error leyendo credenciales: {}", e))?;
+    let raw = obfuscate(&enc);
+    let val: serde_json::Value = serde_json::from_slice(&raw)
+        .map_err(|e| format!("Error deserializando credenciales: {}", e))?;
+
+    let url = val.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let token = val.get("token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+    if url.is_empty() || token.is_empty() {
+        return Err("Las credenciales de Google Apps Script están incompletas.".to_string());
+    }
+
+    Ok((url, token))
+}
+
+/// Guarda de forma segura la URL y el Token en el almacenamiento protegido de la app
 #[tauri::command]
-fn save_gas_config(endpoint_url: String, secret_token: String) -> Result<(), String> {
+fn save_gas_config(
+    app: tauri::AppHandle,
+    endpoint_url: String,
+    secret_token: String,
+) -> Result<(), String> {
     let url_trimmed = endpoint_url.trim();
     let token_trimmed = secret_token.trim();
 
     if url_trimmed.is_empty() {
         return Err("La URL del Web App no puede estar vacía.".into());
     }
-    if !url_trimmed.starts_with("https://script.google.com/") {
+
+    let url_lower = url_trimmed.to_lowercase();
+    if !url_lower.starts_with("https://script.google.com/") {
         return Err("La URL debe ser de Google Apps Script (iniciar con https://script.google.com/).".into());
     }
+
+    // Normalizar el prefijo a minúsculas conservando el ID exacto del script
+    let prefix_len = "https://script.google.com/".len();
+    let normalized_url = format!("https://script.google.com/{}", &url_trimmed[prefix_len..]);
+
     if token_trimmed.is_empty() {
         return Err("El Token Secreto no puede estar vacío.".into());
     }
 
-    let entry_url = keyring::Entry::new(KEYRING_SERVICE, KEYRING_URL_KEY)
-        .map_err(|e| format!("Error en Credential Manager (URL): {}", e))?;
-    let entry_token = keyring::Entry::new(KEYRING_SERVICE, KEYRING_TOKEN_KEY)
-        .map_err(|e| format!("Error en Credential Manager (Token): {}", e))?;
-
-    entry_url.set_password(url_trimmed)
-        .map_err(|e| format!("No se pudo guardar la URL en el Administrador de Credenciales: {}", e))?;
-    entry_token.set_password(token_trimmed)
-        .map_err(|e| format!("No se pudo guardar el Token en el Administrador de Credenciales: {}", e))?;
-
+    internal_save_credentials(&app, &normalized_url, token_trimmed)?;
     Ok(())
 }
 
 /// Devuelve el estado de la configuración (NUNCA expone el token a JavaScript)
 #[tauri::command]
-fn get_gas_config_status() -> Result<serde_json::Value, String> {
-    let entry_url = keyring::Entry::new(KEYRING_SERVICE, KEYRING_URL_KEY)
-        .map_err(|e| e.to_string())?;
-    let entry_token = keyring::Entry::new(KEYRING_SERVICE, KEYRING_TOKEN_KEY)
-        .map_err(|e| e.to_string())?;
-
-    let url_opt = entry_url.get_password().ok();
-    let has_token = entry_token.get_password().is_ok();
-    let is_configured = url_opt.is_some() && has_token;
-
-    let display_url = match url_opt {
-        Some(u) if u.len() > 40 => {
-            format!("{}...{}", &u[..32], &u[u.len() - 10..])
+fn get_gas_config_status(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    match internal_load_credentials(&app) {
+        Ok((url, _token)) => {
+            let display_url = if url.len() > 40 {
+                format!("{}...{}", &url[..32], &url[url.len() - 10..])
+            } else {
+                url
+            };
+            Ok(serde_json::json!({
+                "is_configured": true,
+                "endpoint_url": display_url,
+                "has_token": true
+            }))
         }
-        Some(u) => u,
-        None => String::new(),
-    };
-
-    Ok(serde_json::json!({
-        "is_configured": is_configured,
-        "endpoint_url": display_url,
-        "has_token": has_token
-    }))
+        Err(_) => {
+            Ok(serde_json::json!({
+                "is_configured": false,
+                "endpoint_url": "",
+                "has_token": false
+            }))
+        }
+    }
 }
 
 /// Prueba la conexión enviando una acción ping con el token secreto inyectado desde Rust
 #[tauri::command]
-async fn test_gas_connection() -> Result<serde_json::Value, String> {
-    let entry_url = keyring::Entry::new(KEYRING_SERVICE, KEYRING_URL_KEY)
-        .map_err(|e| e.to_string())?;
-    let entry_token = keyring::Entry::new(KEYRING_SERVICE, KEYRING_TOKEN_KEY)
-        .map_err(|e| e.to_string())?;
-
-    let url = entry_url.get_password()
-        .map_err(|_| "La URL de Google Apps Script no está configurada.".to_string())?;
-    let token = entry_token.get_password()
-        .map_err(|_| "El Token Secreto no está configurado.".to_string())?;
+async fn test_gas_connection(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let (url, token) = internal_load_credentials(&app)?;
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(35))
@@ -410,7 +448,8 @@ async fn test_gas_connection() -> Result<serde_json::Value, String> {
 
     let payload = serde_json::json!({
         "token": token,
-        "action": "ping"
+        "action": "ping",
+        "table": "test"
     });
 
     let res = client
@@ -450,19 +489,12 @@ async fn test_gas_connection() -> Result<serde_json::Value, String> {
 /// Envía un registro a Google Apps Script inyectando el token secreto desde Rust
 #[tauri::command]
 async fn send_gas_record(
+    app: tauri::AppHandle,
     table: String,
     action: String,
     record: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    let entry_url = keyring::Entry::new(KEYRING_SERVICE, KEYRING_URL_KEY)
-        .map_err(|e| e.to_string())?;
-    let entry_token = keyring::Entry::new(KEYRING_SERVICE, KEYRING_TOKEN_KEY)
-        .map_err(|e| e.to_string())?;
-
-    let url = entry_url.get_password()
-        .map_err(|_| "La URL de Google Apps Script no está configurada.".to_string())?;
-    let token = entry_token.get_password()
-        .map_err(|_| "El Token Secreto no está configurado.".to_string())?;
+    let (url, token) = internal_load_credentials(&app)?;
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(45))
@@ -531,4 +563,18 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_obfuscation_roundtrip() {
+        let original = b"{\"url\":\"https://script.google.com/macros/s/test/exec\",\"token\":\"secret123\"}";
+        let enc = obfuscate(original);
+        assert_ne!(enc, original);
+        let dec = obfuscate(&enc);
+        assert_eq!(dec, original);
+    }
 }

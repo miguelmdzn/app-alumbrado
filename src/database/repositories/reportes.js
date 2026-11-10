@@ -17,6 +17,9 @@ import {
   generateUUID,
 } from '../core.js';
 
+import { findOrCreateLocalidad } from './localidades.js';
+import { enqueueRecord, processSyncQueue } from './syncQueue.js';
+
 const TABLE = 'reportes';
 
 // ---------------------------------------------------------------------------
@@ -54,6 +57,9 @@ function toRecord(data, uuid) {
     referencias: (data.referencias || '').trim(),
     entre_calles: (data.entre_calles || data.entreCalles || '').trim(),
     estatus: normalizeEstatus(data.estatus),
+    tipo_localidad: (data.tipo_localidad || 'Cabecera municipal (Valle de Santiago)').trim(),
+    created_at: data.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 }
 
@@ -75,9 +81,11 @@ export async function saveReporte(reportData) {
         `INSERT OR REPLACE INTO ${TABLE} (
            id, folio, fecha, atendio, usuario, direccion, colonia_comunidad,
            telefono, numero_lamparas, tipo_lampara, tipo_falla, observaciones,
-           referencias, entre_calles, estatus, updated_at
+           referencias, entre_calles, estatus, tipo_localidad, created_at, updated_at
          ) VALUES (
-           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+           COALESCE((SELECT created_at FROM ${TABLE} WHERE id = $1), CURRENT_TIMESTAMP),
+           CURRENT_TIMESTAMP
          );`,
         [
           record.id,
@@ -95,6 +103,7 @@ export async function saveReporte(reportData) {
           record.referencias,
           record.entre_calles,
           record.estatus,
+          record.tipo_localidad,
         ]
       );
     } catch (err) {
@@ -104,6 +113,30 @@ export async function saveReporte(reportData) {
 
   // 2. Respaldo en IndexedDB
   await idbPut(TABLE, record);
+
+  // 3. Auto-registrar localidad si hay nombre de colonia/comunidad
+  if (record.colonia_comunidad) {
+    try {
+      // Mapeamos el tipo_localidad del reporte al tipo de localidad
+      const tipoLocalidad = record.tipo_localidad === 'Comunidad'
+        ? 'Comunidad'
+        : 'Cabecera municipal';
+      await findOrCreateLocalidad(record.colonia_comunidad, tipoLocalidad);
+    } catch (err) {
+      console.warn('[reportes] No se pudo auto-registrar localidad:', err);
+    }
+  }
+
+  // 4. Encolar en la cola de sincronización para Google Sheets (offline-first)
+  try {
+    await enqueueRecord('reportes', record.id, record);
+    // Disparar sincronización en segundo plano con Google Apps Script
+    processSyncQueue('reportes').catch((err) => {
+      console.warn('[reportes] Sincronización en cola pendiente:', err);
+    });
+  } catch (err) {
+    console.warn('[reportes] Error al encolar en syncQueue:', err);
+  }
 
   return record;
 }

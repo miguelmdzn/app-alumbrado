@@ -518,7 +518,7 @@ body {
   line-height: 1.45;
 }
 
-.field-input:not([type="date"]):not([type="time"]):not([type="number"]):not(#geoLink):not(#inputAuthCode),
+.field-input:not([type="date"]):not([type="time"]):not([type="number"]):not(#geoLink):not(#inputAuthCode):not(#inputGasUrl):not(#inputGasToken),
 .field-textarea {
   text-transform: uppercase;
 }
@@ -680,6 +680,61 @@ body {
   color: var(--text-muted);
   text-align: center;
   font-style: italic;
+}
+
+/* --------------------------------------------------------------------------
+   Autocomplete de Localidades / Colonias
+   -------------------------------------------------------------------------- */
+.autocomplete-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #FFFFFF;
+  border: 1px solid var(--border-line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.22);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.autocomplete-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid #F1F5F9;
+  transition: background 0.1s ease;
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item.active,
+.autocomplete-item:hover {
+  background: #F0F6FF;
+}
+
+.autocomplete-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.autocomplete-item-sub {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 /* --------------------------------------------------------------------------
@@ -2545,8 +2600,10 @@ body {
 }
 
 
-/* ── Google Sheets auth input: NO aplicar text-transform para preservar el código exacto ── */
-#inputAuthCode {
+/* ── Google Sheets auth & GAS inputs: NO aplicar text-transform para preservar URLs y tokens exactos ── */
+#inputAuthCode,
+#inputGasUrl,
+#inputGasToken {
   text-transform: none !important;
   font-family: monospace;
   letter-spacing: 0.5px;

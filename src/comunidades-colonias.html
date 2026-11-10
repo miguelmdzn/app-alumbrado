@@ -6,26 +6,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comunidades y Colonias - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('btnToggleHerramientas')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        const group = document.getElementById('navGroupHerramientas');
-        if (group) {
-          const isOpen = group.classList.toggle('is-open');
-          document.getElementById('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
-        }
-      });
-    });
-  </script>
+  <script type="module" src="comunidades-colonias.js" defer></script>
 </head>
 
 <body>
+  <!-- Notificación Toast flotante -->
+  <div id="toastNotification" class="toast-notification hidden" role="alert">
+    <div class="toast-icon" id="toastIcon"></div>
+    <span class="toast-message" id="toastMessage"></span>
+    <button type="button" class="toast-close" id="toastClose" aria-label="Cerrar">&times;</button>
+  </div>
+
   <div class="app-shell">
     <aside class="app-sidebar noprint">
       <div class="sidebar-brand">
         <div class="sidebar-brand-badge">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="2" x2="12" y2="6"></line>
             <line x1="12" y1="18" x2="12" y2="22"></line>
             <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
@@ -44,7 +41,8 @@
 
       <nav class="sidebar-menu">
         <a href="registros-reportes.html" class="sidebar-menu-item" id="navSidebarReportes">
-          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
             <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -55,7 +53,8 @@
         </a>
 
         <a href="registros.html" class="sidebar-menu-item" id="navSidebarEvidencias">
-          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
             <circle cx="12" cy="13" r="4"></circle>
           </svg>
@@ -63,7 +62,8 @@
         </a>
 
         <a href="personal.html" class="sidebar-menu-item" id="navSidebarPersonal">
-          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
             <circle cx="9" cy="7" r="4"></circle>
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -73,17 +73,22 @@
         </a>
 
         <div class="sidebar-dropdown-group is-open" id="navGroupHerramientas">
-          <a href="herramientas.html" class="sidebar-menu-item sidebar-dropdown-toggle" id="btnToggleHerramientas" aria-expanded="true">
+          <a href="herramientas.html" class="sidebar-menu-item sidebar-dropdown-toggle" id="btnToggleHerramientas"
+            aria-expanded="true">
             <span class="sidebar-dropdown-label">
-              <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+              <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z">
+                </path>
               </svg>
               <span>Herramientas</span>
             </span>
-            <svg class="sidebar-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="sidebar-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
-          </button>
+          </a>
           <div class="sidebar-submenu" id="sidebarSubmenuHerramientas">
             <a href="justificantes.html" class="sidebar-submenu-item" id="navSubJustificantes">
               <span class="sidebar-submenu-bullet">•</span> Justificantes
@@ -110,28 +115,123 @@
 
     <div class="app-main-content">
       <main class="app-container">
+
+        <!-- Encabezado -->
         <header class="app-top-nav">
           <div class="nav-title-group">
             <h1 class="app-title">Comunidades y Colonias</h1>
-            <p class="app-desc">Catálogo de localidades, sectores y rutas del municipio.</p>
+            <p class="app-desc">Catálogo de localidades del municipio (colonias y comunidades / rancherías).</p>
+          </div>
+          <div class="nav-actions">
+            <button type="button" class="btn btn-primary btn-nav-link" id="btnNuevaLocalidad">
+              <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Agregar localidad
+            </button>
           </div>
         </header>
 
-        <section class="records-container-card" style="padding: 40px 24px; text-align: center;">
-          <div style="max-width: 460px; margin: 0 auto;">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;">
-              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
-              <line x1="8" y1="2" x2="8" y2="18"></line>
-              <line x1="16" y1="6" x2="16" y2="22"></line>
-            </svg>
-            <h2 style="font-size: 18px; color: var(--primary); margin: 0 0 8px;">Módulo de Comunidades y Colonias</h2>
-            <p style="color: var(--text-muted); font-size: 13.5px; margin: 0 0 20px;">Esta herramienta estará disponible próximamente en las siguientes actualizaciones.</p>
-            <a href="dias-inhabiles.html" class="btn btn-secondary">Ir a Días Inhábiles</a>
+        <!-- Tabla de localidades -->
+        <section class="records-container-card">
+          <div class="records-toolbar">
+            <div class="records-toolbar-left">
+              <div class="records-search-wrapper">
+                <input type="search" id="searchLocalidades"
+                  placeholder="Buscar por nombre o tipo..." class="field-input">
+              </div>
+              <select id="filterTipo" class="field-select records-status-select" aria-label="Filtrar por tipo">
+                <option value="">TODOS LOS TIPOS</option>
+                <option value="Cabecera municipal">CABECERA MUNICIPAL</option>
+                <option value="Comunidad">COMUNIDAD</option>
+              </select>
+            </div>
+            <div class="records-stats-summary">
+              <div class="stat-pill">Total: <strong id="lblTotal">0</strong></div>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="records-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Tipo</th>
+                  <th class="td-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="localidadesTableBody">
+              </tbody>
+            </table>
           </div>
         </section>
+
       </main>
     </div>
   </div>
+
+  <!-- Modal: Crear / Editar localidad -->
+  <div id="modalLocalidad" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modalLocalidadTitle">
+    <div class="modal-card">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalLocalidadTitle">Nueva Localidad</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarModalLocalidadX" aria-label="Cerrar">&times;</button>
+      </div>
+
+      <form id="formLocalidad" autocomplete="off">
+        <div class="form-grid" style="gap:16px; margin-bottom:20px;">
+          <label class="field col-4">
+            <span class="field-label">Nombre <span class="required">*</span></span>
+            <input type="text" id="inputNombreLocalidad" class="field-input"
+              placeholder="Ej. COL. BELLAVISTA" required>
+          </label>
+          <label class="field col-4">
+            <span class="field-label">Tipo <span class="required">*</span></span>
+            <select id="selectTipoLocalidad" class="field-select" required>
+              <option value="Cabecera municipal">CABECERA MUNICIPAL (VALLE DE SANTIAGO)</option>
+              <option value="Comunidad">COMUNIDAD / RANCHO</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelarLocalidad">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btnGuardarLocalidad">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Ver detalle -->
+  <div id="modalDetalleLocalidad" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modalDetalleTitleLoc">
+    <div class="modal-card">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalDetalleTitleLoc">Detalle de Localidad</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarDetalleLocX" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="detail-grid" id="modalDetalleLocContent"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCerrarDetalleLoc">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirmar eliminación -->
+  <div id="modalEliminarLocalidad" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modalEliminarTitleLoc">
+    <div class="modal-card">
+      <h2 class="modal-title" id="modalEliminarTitleLoc">Eliminar localidad</h2>
+      <p class="modal-text">¿Estás seguro de que deseas eliminar esta localidad? Esta acción no se puede deshacer.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCancelarEliminarLoc">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="btnConfirmarEliminarLoc">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>

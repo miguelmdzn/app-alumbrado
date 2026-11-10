@@ -182,9 +182,24 @@
               <input type="text" id="direccion" placeholder="Ej. Calle Morelos #120" class="field-input">
             </label>
 
+            <!-- Tipo de localidad -->
+            <label class="field col-1">
+              <span class="field-label">Tipo de localidad</span>
+              <select id="tipoLocalidad" class="field-select">
+                <option value="Cabecera municipal (Valle de Santiago)">CABECERA MUNICIPAL (VALLE DE SANTIAGO)</option>
+                <option value="Comunidad">COMUNIDAD</option>
+              </select>
+            </label>
+
+            <!-- Colonia / comunidad con autocomplete -->
             <label class="field col-1">
               <span class="field-label">Colonia o comunidad</span>
-              <input type="text" id="colonia" placeholder="Ej. Col. Bellavista" class="field-input">
+              <div class="autocomplete-wrapper">
+                <input type="text" id="colonia" placeholder="Ej. Col. Bellavista" class="field-input"
+                  autocomplete="off" aria-autocomplete="list" aria-controls="listColoniaComunidad">
+                <ul id="listColoniaComunidad" class="autocomplete-list" role="listbox" style="display:none;">
+                </ul>
+              </div>
             </label>
 
             <!-- Fila 3 -->

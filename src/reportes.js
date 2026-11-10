@@ -15,7 +15,10 @@ import {
   initDatabase,
   saveReporte,
   getReporteById,
+  searchLocalidades,
 } from './db.js';
+
+import { processSyncQueue } from './database/repositories/syncQueue.js';
 
 import {
   attachInputNormalizers,
@@ -33,6 +36,78 @@ const today = () => {
 let toastTimeout = null;
 let editingId = null;
 let editingEstatus = 'En espera';
+
+/* --------------------------------------------------------------------------
+   Autocomplete de Colonia / Comunidad
+   -------------------------------------------------------------------------- */
+function setupColoniaAutocomplete() {
+  const input = document.getElementById('colonia');
+  const list  = document.getElementById('listColoniaComunidad');
+  if (!input || !list) return;
+
+  let debounceTimer = null;
+
+  function hideList() {
+    list.style.display = 'none';
+    list.innerHTML = '';
+  }
+
+  async function showSuggestions(query) {
+    const results = await searchLocalidades(query);
+    list.innerHTML = '';
+    if (!results.length) { hideList(); return; }
+
+    results.forEach((loc) => {
+      const li = document.createElement('li');
+      li.className = 'autocomplete-item';
+      li.setAttribute('role', 'option');
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'autocomplete-item-name';
+      nameSpan.textContent = loc.nombre;
+
+      const subSpan = document.createElement('span');
+      subSpan.className = 'autocomplete-item-sub';
+      subSpan.textContent = loc.tipo === 'Comunidad' ? 'Comunidad / Rancho' : 'Cabecera municipal (Valle de Santiago)';
+
+      li.appendChild(nameSpan);
+      li.appendChild(subSpan);
+
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        input.value = loc.nombre;
+        // sincronizar tipo_localidad automáticamente
+        const selTipo = document.getElementById('tipoLocalidad');
+        if (selTipo && loc.tipo) {
+          if (loc.tipo === 'Comunidad') {
+            selTipo.value = 'Comunidad';
+          } else {
+            selTipo.value = 'Cabecera municipal (Valle de Santiago)';
+          }
+        }
+        hideList();
+      });
+
+      list.appendChild(li);
+    });
+    list.style.display = 'block';
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = input.value.trim();
+    if (q.length < 1) { hideList(); return; }
+    debounceTimer = setTimeout(() => showSuggestions(q), 200);
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(hideList, 150);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideList();
+  });
+}
 
 /* --------------------------------------------------------------------------
    Notificaciones Toast
@@ -194,6 +269,12 @@ function fillForm(reporte) {
   $('referencias').value = reporte.referencias || '';
   $('observaciones').value = reporte.observaciones || '';
 
+  // Tipo de localidad
+  const selTipo = $('tipoLocalidad');
+  if (selTipo) {
+    selTipo.value = reporte.tipo_localidad || 'Cabecera municipal (Valle de Santiago)';
+  }
+
   applySelectValue($('tipoLampara'), reporte.tipo_lampara, $('wrapOtroLampara'), $('otroLampara'));
   applySelectValue($('tipoFalla'), reporte.tipo_falla, $('wrapOtroFalla'), $('otroFalla'));
   applySelectValue($('estatus'), reporte.estatus || 'En espera', $('wrapOtroEstatus'), $('otroEstatus'));
@@ -313,7 +394,8 @@ $('reporteForm')?.addEventListener('submit', async (e) => {
     entre_calles: normalizeFinal($('entreCalles').value),
     referencias: normalizeFinal($('referencias').value),
     observaciones: normalizeFinal($('observaciones').value),
-    estatus: finalEstatus || (editingId ? editingEstatus : 'En espera')
+    estatus: finalEstatus || (editingId ? editingEstatus : 'En espera'),
+    tipo_localidad: $('tipoLocalidad')?.value || 'Cabecera municipal (Valle de Santiago)',
   };
 
   if (editingId) reportData.id = editingId;
@@ -339,6 +421,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   setupConditionalFields();
+  setupColoniaAutocomplete();
   attachInputNormalizers(document);
 
   if ($('fecha')) $('fecha').value = today();
@@ -347,6 +430,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (editId) {
     await loadReporteForEdit(editId);
   }
+
+  // Sincronización automática al recuperar conexión
+  window.addEventListener('online', () => {
+    console.info('[reportes] Conexión restaurada, procesando cola de reportes...');
+    processSyncQueue('reportes').then((res) => {
+      if (res.synced > 0) {
+        showToast('success', `Conexión restaurada: ${res.synced} reporte(s) sincronizado(s) con Google Sheets.`);
+      }
+    });
+  });
 
   // Toggle de submenú Herramientas en barra lateral
   $('btnToggleHerramientas')?.addEventListener('click', (e) => {

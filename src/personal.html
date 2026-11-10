@@ -282,7 +282,9 @@
 
       <div>
         <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5;">
-          Sincronización directa mediante <strong>Google Apps Script</strong> con la hoja <strong>PERSONAL</strong> (a partir de la celda <strong>A3</strong>). Los registros se sincronizan de forma segura mediante el backend de Rust.
+          Sincronización directa mediante <strong>Google Apps Script</strong> con la hoja <strong>PERSONAL</strong> (a
+          partir de la celda <strong>A3</strong>). Los registros se sincronizan de forma segura mediante el backend de
+          Rust.
         </p>
 
         <div
@@ -295,26 +297,31 @@
           <label class="field" style="margin-bottom: 12px;">
             <span class="field-label" style="font-size: 12px;">URL de la Aplicación Web (Google Apps Script):</span>
             <input type="text" id="inputGasUrl" placeholder="https://script.google.com/macros/s/.../exec"
-              class="field-input" style="font-size: 12.5px; text-transform: none;">
+              class="field-input" data-keep-case="true" autocomplete="off" spellcheck="false"
+              style="font-size: 12.5px; text-transform: none;">
           </label>
 
           <label class="field" style="margin-bottom: 12px;">
             <span class="field-label" style="font-size: 12px;">Token Secreto:</span>
             <input type="password" id="inputGasToken" placeholder="Ingresa el token configurado en el script"
-              class="field-input" style="font-size: 12.5px; text-transform: none;">
+              class="field-input" data-keep-case="true" autocomplete="off"
+              style="font-size: 12.5px; text-transform: none;">
             <p style="font-size: 11px; color: #64748B; margin: 4px 0 0;">
-              🔒 <em>El token se almacena de forma segura en el Administrador de Credenciales de Windows mediante Rust y nunca se expone en el navegador.</em>
+              🔒 <em>El token se almacena de forma segura en el Administrador de Credenciales de Windows mediante Rust y
+                nunca se expone en el navegador.</em>
             </p>
           </label>
 
           <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px;">
             <button type="button" class="btn btn-primary" id="btnGuardarGasConfig">Guardar Credenciales</button>
             <button type="button" class="btn btn-secondary" id="btnProbarConexionGas">Probar Conexión</button>
+            <button type="button" class="btn btn-secondary" id="btnSincronizarPendientes">Sincronizar
+              Pendientes</button>
           </div>
+          <div id="syncQueueStatus" style="font-size: 11.5px; color: #64748B; margin-top: 8px; display: none;"></div>
         </div>
 
-        <div
-          style="display: flex; justify-content: flex-end; align-items: center; margin-top: 16px; gap: 8px;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 16px; gap: 8px;">
           <button type="button" class="btn btn-secondary" id="btnCerrarSheetsModal">Cerrar</button>
         </div>
       </div>

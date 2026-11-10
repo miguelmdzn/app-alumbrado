@@ -43,9 +43,18 @@ export function attachInputNormalizers(container = document) {
   const elements = container.querySelectorAll(selector);
 
   elements.forEach((el) => {
-    // Excluir si ya fue inicializado o si es un enlace de maps
+    // Excluir si ya fue inicializado o si es un enlace o credencial sensible a mayúsculas/minúsculas
     if (el.dataset.normalizerAttached === 'true') return;
-    if (el.id === 'geoLink') return; // Conservar URLs tal cual
+    if (
+      el.id === 'geoLink' ||
+      el.id === 'inputGasUrl' ||
+      el.id === 'inputGasToken' ||
+      el.id === 'inputAuthCode' ||
+      el.dataset.keepCase === 'true' ||
+      el.closest('#modalGoogleSheets')
+    ) {
+      return; // Conservar URLs y tokens con mayúsculas y minúsculas exactas
+    }
 
     el.dataset.normalizerAttached = 'true';
 

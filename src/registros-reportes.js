@@ -19,6 +19,7 @@ import {
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
+import { processSyncQueue } from './database/repositories/syncQueue.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -154,6 +155,10 @@ function openDetalleModal(id) {
     <div class="detail-item">
       <span class="detail-label">Teléfono de contacto</span>
       <span class="detail-value">${esc(r.telefono || '—')}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Tipo de localidad</span>
+      <span class="detail-value">${esc(r.tipo_localidad || 'Cabecera municipal (Valle de Santiago)')}</span>
     </div>
     <div class="detail-item-full detail-item">
       <span class="detail-label">Dirección y Colonia</span>
@@ -664,7 +669,7 @@ function applyFilterAndRender() {
     filtered = filtered.filter((r) => {
       return [
         r.folio, r.usuario, r.atendio, r.direccion,
-        r.colonia_comunidad, r.tipo_falla, r.tipo_lampara,
+        r.colonia_comunidad, r.tipo_localidad, r.tipo_falla, r.tipo_lampara,
         r.referencias, r.entre_calles, r.observaciones, r.telefono,
         r.estatus
       ].some((v) => (v || '').toLowerCase().includes(query));
@@ -753,6 +758,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   $('btnExportPdf')?.addEventListener('click', () => {
     window.print();
+  });
+
+  // Reintento automático de sincronización al volver internet
+  window.addEventListener('online', () => {
+    console.info('[registros-reportes] Conexión restaurada, procesando cola de reportes...');
+    processSyncQueue('reportes');
   });
 
   // Toggle de submenú Herramientas en barra lateral

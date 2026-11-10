@@ -198,6 +198,64 @@ const MIGRATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // v7 — Cola de sincronización segura offline-first (Google Sheets / GAS)
+  // -------------------------------------------------------------------------
+  {
+    version: 7,
+    name: 'create_sync_queue',
+    up: `
+      CREATE TABLE IF NOT EXISTS sync_queue (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        table_name    TEXT NOT NULL,
+        record_id     TEXT NOT NULL,
+        payload_json  TEXT NOT NULL,
+        status        TEXT NOT NULL DEFAULT 'pending',
+        last_error    TEXT,
+        retry_count   INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        synced_at     TEXT
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_unique_record
+        ON sync_queue (table_name, record_id);
+
+      CREATE INDEX IF NOT EXISTS idx_sync_status
+        ON sync_queue (status);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v8 — Agrega tipo_localidad a reportes (preserva datos existentes)
+  // -------------------------------------------------------------------------
+  {
+    version: 8,
+    name: 'add_tipo_localidad_to_reportes',
+    up: `
+      ALTER TABLE reportes ADD COLUMN tipo_localidad TEXT DEFAULT 'Cabecera municipal (Valle de Santiago)'
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v9 — Tabla de localidades (colonias y comunidades del municipio)
+  // -------------------------------------------------------------------------
+  {
+    version: 9,
+    name: 'create_localidades',
+    up: `
+      CREATE TABLE IF NOT EXISTS localidades (
+        id         TEXT PRIMARY KEY,
+        nombre     TEXT NOT NULL,
+        tipo       TEXT NOT NULL DEFAULT 'Cabecera municipal',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_localidades_nombre_tipo ON localidades (nombre, tipo);
+      CREATE INDEX IF NOT EXISTS idx_localidades_tipo ON localidades (tipo)
+    `
+  },
+
+  // -------------------------------------------------------------------------
   // → PLANTILLA para futuras tablas — copiar y ajustar
   //
   // {
