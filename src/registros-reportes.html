@@ -116,6 +116,22 @@
           </div>
         </div>
       </nav>
+
+      <!-- Footer del Sidebar: Google Sheets -->
+      <div class="sidebar-footer">
+        <button type="button" class="sidebar-footer-btn" id="btnSidebarGoogleSheets"
+          title="Sincronización con Google Sheets">
+          <svg class="sidebar-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="8" y1="13" x2="16" y2="13"></line>
+            <line x1="8" y1="17" x2="16" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span>Google Sheets</span>
+        </button>
+      </div>
     </aside>
 
     <!-- Contenido Principal -->
@@ -145,6 +161,16 @@
                 </svg>
                 Nuevo reporte
               </a>
+
+              <button type="button" class="btn btn-success btn-nav-link" id="btnGenerarInforme">
+                <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10"></line>
+                  <line x1="12" y1="20" x2="12" y2="4"></line>
+                  <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                Generar informe
+              </button>
 
               <button type="button" class="btn btn-primary btn-nav-link" id="btnExportPdf">
                 <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -201,6 +227,7 @@
                 </tbody>
               </table>
             </div>
+            <div class="table-pagination" id="tablePagination"></div>
           </section>
 
         </div>
@@ -259,6 +286,40 @@
       <div class="modal-actions modal-actions-options">
         <button type="button" class="btn btn-secondary" id="btnSoloTerminado">Solo terminado</button>
         <button type="button" class="btn btn-primary" id="btnAnadirEvidencia">Añadir a evidencia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Generar Informe Estadístico -->
+  <div id="modalGenerarInforme" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modalInformeTitle">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalInformeTitle">Generar Informe Estadístico</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarInformeX" aria-label="Cerrar">&times;</button>
+      </div>
+      <p class="modal-text">Selecciona el rango de fechas para el informe de métricas de reportes.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0;">
+        <label class="field">
+          <span class="field-label">Fecha inicio</span>
+          <input type="date" id="informeFechaInicio" class="field-input">
+        </label>
+        <label class="field">
+          <span class="field-label">Fecha fin</span>
+          <input type="date" id="informeFechaFin" class="field-input">
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCancelarInforme">Cancelar</button>
+        <button type="button" class="btn btn-success" id="btnConfirmarInforme">
+          <svg style="width:14px;height:14px;margin-right:5px;vertical-align:middle;" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          Generar informe
+        </button>
       </div>
     </div>
   </div>

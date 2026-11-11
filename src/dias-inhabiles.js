@@ -22,6 +22,8 @@ import {
   normalizeFinal,
 } from './normalizer.js';
 
+import { TablePaginator } from './table-pagination.js';
+
 const $ = (id) => document.getElementById(id);
 
 const esc = (s) =>
@@ -57,9 +59,16 @@ function formatFechaLarga(fechaIso) {
 }
 
 let allDias = [];
+let lastFilteredDias = [];
 let editingId = null;
 let deletingId = null;
 let toastTimeout = null;
+
+const paginator = new TablePaginator({
+  containerId: 'tablePagination',
+  onPageChange: () => renderTable(lastFilteredDias),
+  storageKey: 'paginator_dias',
+});
 
 const EYE_ICON = `
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -133,6 +142,8 @@ function renderTable(diasList) {
   const tbody = $('diasTableBody');
   if (!tbody) return;
 
+  lastFilteredDias = diasList;
+
   // Actualizar estadísticas globales
   const total = allDias.length;
   const oficiales = allDias.filter((d) => (d.tipo || '').toLowerCase() === 'oficial').length;
@@ -144,7 +155,9 @@ function renderTable(diasList) {
   if ($('lblMunicipales')) $('lblMunicipales').textContent = municipales;
   if ($('lblActivos')) $('lblActivos').textContent = activos;
 
-  if (diasList.length === 0) {
+  const pageData = paginator.getCurrentSlice(diasList);
+
+  if (pageData.length === 0) {
     const hasQuery = ($('searchInput')?.value || '').trim();
     tbody.innerHTML = `
       <tr>
@@ -153,10 +166,11 @@ function renderTable(diasList) {
         </td>
       </tr>
     `;
+    paginator.update(diasList.length);
     return;
   }
 
-  tbody.innerHTML = diasList.map((d) => {
+  tbody.innerHTML = pageData.map((d) => {
     const infoFecha = formatFechaLarga(d.fecha);
     const esOficial = (d.tipo || '').toLowerCase() === 'oficial';
     const esActivo = d.activo === 1 || d.activo === true || d.activo === '1';
@@ -203,6 +217,8 @@ function renderTable(diasList) {
   tbody.querySelectorAll('[data-eliminar]').forEach((btn) => {
     btn.onclick = () => openModalEliminar(btn.dataset.eliminar);
   });
+
+  paginator.update(diasList.length);
 }
 
 /* --------------------------------------------------------------------------
@@ -246,6 +262,7 @@ function applyFilterAndRender() {
     });
   }
 
+  paginator.resetPage();
   renderTable(filtered);
 }
 
@@ -522,16 +539,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (!$('modalDiaInhabil')?.classList.contains('hidden')) closeModalDia();
       if (!$('modalDetalleDia')?.classList.contains('hidden')) closeModalDetalle();
       if (!$('modalEliminarDia')?.classList.contains('hidden')) closeModalEliminar();
-    }
-  });
-
-  // Toggle de submenú Herramientas en barra lateral
-  $('btnToggleHerramientas')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const group = $('navGroupHerramientas');
-    if (group) {
-      const isOpen = group.classList.toggle('is-open');
-      $('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
     }
   });
 });

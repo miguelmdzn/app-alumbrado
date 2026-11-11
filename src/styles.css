@@ -2608,3 +2608,172 @@ body {
   font-family: monospace;
   letter-spacing: 0.5px;
 }
+
+
+/* ==========================================================================
+   ADICIONES — Paginación, Sidebar Footer, Botón Success
+   ========================================================================== */
+
+/* ----------------------------------------------------------
+   Paginación de Tabla
+   ---------------------------------------------------------- */
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-line);
+  background: var(--bg-muted);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pagination-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border-line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.pagination-rows-select {
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-line);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  background: var(--bg-card);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pagination-page-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------
+   Botón Success (verde) para "Generar informe"
+   ---------------------------------------------------------- */
+.btn-success {
+  background: #1a7a4a;
+  color: #fff;
+  border: 1px solid #15623b;
+}
+
+.btn-success:hover {
+  background: #15623b;
+  color: #fff;
+}
+
+/* ----------------------------------------------------------
+   Sidebar Footer con botón Google Sheets
+   ---------------------------------------------------------- */
+.sidebar-footer {
+  padding: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-footer-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: #94A3B8;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.sidebar-footer-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+}
+
+
+/* ----------------------------------------------------------
+   Estilos complementarios de TablePaginator
+   ---------------------------------------------------------- */
+.pagination-pages-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination-num {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+.pagination-ellipsis {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 4px;
+  user-select: none;
+}
+
+.pagination-auto-select-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.pagination-auto-select-label select {
+  cursor: pointer;
+}

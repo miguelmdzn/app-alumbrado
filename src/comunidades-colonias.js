@@ -15,6 +15,7 @@ import {
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
+import { TablePaginator } from './table-pagination.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,6 +34,12 @@ let allLocalidades = [];
 let editingId = null;
 let deletingId = null;
 let toastTimeout = null;
+
+const paginator = new TablePaginator({
+  containerId: 'tablePagination',
+  onPageChange: () => renderTable(),
+  storageKey: 'paginator_localidades',
+});
 
 // ---------------------------------------------------------------------------
 // Toast flotante
@@ -115,7 +122,9 @@ function renderTable() {
 
   if ($('lblTotal')) $('lblTotal').textContent = list.length;
 
-  if (list.length === 0) {
+  const pageData = paginator.getCurrentSlice(list);
+
+  if (pageData.length === 0) {
     const q = ($('searchLocalidades')?.value || '').trim();
     tbody.innerHTML = `
       <tr>
@@ -124,10 +133,11 @@ function renderTable() {
         </td>
       </tr>
     `;
+    paginator.update(list.length);
     return;
   }
 
-  tbody.innerHTML = list.map((r) => `
+  tbody.innerHTML = pageData.map((r) => `
     <tr>
       <td><strong>${esc(r.nombre || '—')}</strong></td>
       <td><span class="badge-status ${r.tipo === 'Comunidad' ? 'badge-status-pendiente' : 'badge-status-atendido'}">${esc(tipoLabel(r.tipo))}</span></td>
@@ -151,6 +161,8 @@ function renderTable() {
   tbody.querySelectorAll('[data-eliminar]').forEach((btn) => {
     btn.onclick = () => openEliminarModal(btn.dataset.eliminar);
   });
+
+  paginator.update(list.length);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,8 +318,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Búsqueda y filtro en tiempo real
-  $('searchLocalidades')?.addEventListener('input', renderTable);
-  $('filterTipo')?.addEventListener('change', renderTable);
+  $('searchLocalidades')?.addEventListener('input', () => {
+    paginator.resetPage();
+    renderTable();
+  });
+  $('filterTipo')?.addEventListener('change', () => {
+    paginator.resetPage();
+    renderTable();
+  });
 
   // Botón Agregar
   $('btnNuevaLocalidad')?.addEventListener('click', openCreateModal);
@@ -340,16 +358,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (!$('modalLocalidad')?.classList.contains('hidden')) closeLocalidadModal();
       if (!$('modalDetalleLocalidad')?.classList.contains('hidden')) closeDetalleModal();
       if (!$('modalEliminarLocalidad')?.classList.contains('hidden')) closeEliminarModal();
-    }
-  });
-
-  // Toggle submenú Herramientas
-  $('btnToggleHerramientas')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const group = $('navGroupHerramientas');
-    if (group) {
-      const isOpen = group.classList.toggle('is-open');
-      $('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
     }
   });
 });

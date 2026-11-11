@@ -20,6 +20,7 @@ import {
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
+import { TablePaginator } from './table-pagination.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -58,6 +59,7 @@ const TRASH_ICON = `
 
 // Estado en memoria
 let allRecords = [];
+let lastFilteredRecords = [];
 let personalMap = new Map();
 let metadata = {
   fecha: '',
@@ -65,6 +67,12 @@ let metadata = {
   elab: '',
   reviso: ''
 };
+
+const paginator = new TablePaginator({
+  containerId: 'tablePagination',
+  onPageChange: () => renderTable(lastFilteredRecords),
+  storageKey: 'paginator_evidencias',
+});
 
 function formatAtendioDisplay(atendioRaw) {
   if (!atendioRaw) return '';
@@ -111,7 +119,10 @@ function renderTable(records) {
   const tbody = $('recordsTableBody');
   if (!tbody) return;
 
-  if (records.length === 0) {
+  lastFilteredRecords = records;
+  const pageData = paginator.getCurrentSlice(records);
+
+  if (pageData.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="8" class="table-empty-row">
@@ -119,10 +130,11 @@ function renderTable(records) {
         </td>
       </tr>
     `;
+    paginator.update(records.length);
     return;
   }
 
-  tbody.innerHTML = records.map((r) => {
+  tbody.innerHTML = pageData.map((r) => {
     const mapsTarget = r.mapsUrl || (r.lat != null && r.lon != null ? `https://www.google.com/maps?q=${r.lat},${r.lon}` : '');
 
     const mapsIconHtml = mapsTarget
@@ -182,6 +194,8 @@ function renderTable(records) {
   tbody.querySelectorAll('[data-del]').forEach((btn) => {
     btn.onclick = () => openEliminarEvidenciaModal(btn.dataset.del);
   });
+
+  paginator.update(records.length);
 }
 
 /* --------------------------------------------------------------------------
@@ -477,6 +491,7 @@ function applyFilterAndRender() {
     });
   }
 
+  paginator.resetPage();
   renderTable(filtered);
   renderPrintBitacora(filtered);
 }
@@ -532,11 +547,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.print();
   });
 
-  // Botón: Abrir carpeta de fotos en el explorador
-  $('btnOpenFolder')?.addEventListener('click', async () => {
-    await openEvidenciasFolder();
-  });
-
   // Modales de detalle y confirmación de eliminación
   $('btnCerrarDetalleEvidenciaX')?.addEventListener('click', closeDetalleEvidenciaModal);
   $('btnCerrarDetalleEvidencia')?.addEventListener('click', closeDetalleEvidenciaModal);
@@ -550,14 +560,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (e.target === $('modalEliminarEvidencia')) closeEliminarEvidenciaModal();
   });
 
-  // Toggle de submenú Herramientas en barra lateral
-  $('btnToggleHerramientas')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const group = $('navGroupHerramientas');
-    if (group) {
-      const isOpen = group.classList.toggle('is-open');
-      $('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
-    }
+  // Botón lateral: Google Sheets
+  $('btnSidebarGoogleSheets')?.addEventListener('click', () => {
+    window.location.href = 'personal.html?openSheets=1';
   });
 });
 

@@ -22,6 +22,8 @@ import {
   normalizeFinal,
 } from './normalizer.js';
 
+import { TablePaginator } from './table-pagination.js';
+
 import {
   enqueueRecord,
   processSyncQueue,
@@ -51,9 +53,16 @@ const esc = (s) =>
   }[c]));
 
 let allPersonal = [];
+let lastFilteredPersonal = [];
 let editingId = null;
 let deletingId = null;
 let toastTimeout = null;
+
+const paginator = new TablePaginator({
+  containerId: 'tablePagination',
+  onPageChange: () => renderTable(lastFilteredPersonal),
+  storageKey: 'paginator_personal',
+});
 
 const PENCIL_ICON = `
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -120,6 +129,8 @@ function renderTable(personalList) {
   const tbody = $('personalTableBody');
   if (!tbody) return;
 
+  lastFilteredPersonal = personalList;
+
   // Actualizar contadores
   const total = allPersonal.length;
   const activos = allPersonal.filter((p) => (p.estatus || 'Activo') === 'Activo').length;
@@ -129,7 +140,9 @@ function renderTable(personalList) {
   if ($('lblActivos')) $('lblActivos').textContent = activos;
   if ($('lblInactivos')) $('lblInactivos').textContent = inactivos;
 
-  if (personalList.length === 0) {
+  const pageData = paginator.getCurrentSlice(personalList);
+
+  if (pageData.length === 0) {
     const hasQuery = ($('searchInput')?.value || '').trim();
     const filtro = $('filterEstatus')?.value || 'Activo';
     const emptyText = hasQuery
@@ -147,10 +160,11 @@ function renderTable(personalList) {
         </td>
       </tr>
     `;
+    paginator.update(personalList.length);
     return;
   }
 
-  tbody.innerHTML = personalList.map((p) => {
+  tbody.innerHTML = pageData.map((p) => {
     const nombreCompleto = getFullName(p) || '—';
     const numTrabajador = p.numero_trabajador || '—';
     const numChecador = p.numero_checador_digital || '—';
@@ -183,6 +197,8 @@ function renderTable(personalList) {
   tbody.querySelectorAll('[data-eliminar]').forEach((btn) => {
     btn.onclick = () => openModalEliminar(btn.dataset.eliminar);
   });
+
+  paginator.update(personalList.length);
 }
 
 /* --------------------------------------------------------------------------
@@ -208,6 +224,7 @@ function applyFilterAndRender() {
     });
   }
 
+  paginator.resetPage();
   renderTable(filtered);
 }
 
@@ -447,10 +464,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Modal Google Sheets
-  $('btnGoogleSheets')?.addEventListener('click', openModalGoogleSheets);
+  // Modal Google Sheets (desde el botón en la barra lateral fija)
+  $('btnSidebarGoogleSheets')?.addEventListener('click', openModalGoogleSheets);
   $('btnCerrarSheetsModal')?.addEventListener('click', closeModalGoogleSheets);
   $('btnCerrarSheetsModalX')?.addEventListener('click', closeModalGoogleSheets);
+
+  // Apertura automática si viene el parámetro ?openSheets=1
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('openSheets') === '1') {
+      openModalGoogleSheets();
+    }
+  } catch {}
 
   $('modalGoogleSheets')?.addEventListener('click', (e) => {
     if (e.target === $('modalGoogleSheets')) closeModalGoogleSheets();
@@ -550,16 +575,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         updateSheetsUI();
       }
     }).catch(() => {});
-  });
-
-  // Toggle de submenú Herramientas en barra lateral
-  $('btnToggleHerramientas')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const group = $('navGroupHerramientas');
-    if (group) {
-      const isOpen = group.classList.toggle('is-open');
-      $('btnToggleHerramientas')?.setAttribute('aria-expanded', String(isOpen));
-    }
   });
 });
 
