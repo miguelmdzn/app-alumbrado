@@ -1,11 +1,11 @@
 /**
  * ============================================================================
- * REGISTRO DE REPORTES DE FALLAS â€” Alumbrado PÃºblico (registros-reportes.js)
+ * REGISTRO DE REPORTES DE FALLAS — Alumbrado Público (registros-reportes.js)
  * ============================================================================
- * - Vista en pantalla: tabla interactiva con bÃºsqueda en tiempo real
- * - Vista de impresiÃ³n: diseÃ±o tabular oficial dividido en dos secciones:
- *   1) Pendientes de dÃ­as anteriores (AtenciÃ³n prioritaria, del mÃ¡s antiguo al mÃ¡s reciente)
- *   2) Reportes del dÃ­a (generados el dÃ­a de emisiÃ³n del PDF)
+ * - Vista en pantalla: tabla interactiva con búsqueda en tiempo real
+ * - Vista de impresión: diseño tabular oficial dividido en dos secciones:
+ *   1) Pendientes de días anteriores (Atención prioritaria, del más antiguo al más reciente)
+ *   2) Reportes del día (generados el día de emisión del PDF)
  * ============================================================================
  */
 
@@ -16,6 +16,7 @@ import {
   syncOfficialHolidays,
   getActiveHolidaysSet,
   countBusinessDays,
+  getAllSolicitudesLamparas,
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
@@ -39,10 +40,26 @@ let allReportes = [];
 let pendingAttendId = null;
 let lastFilteredReportes = [];
 
+/* Vista activa: 'reportes' | 'solicitudes' */
+let vistaActual = 'reportes';
+let allSolicitudes = [];
+
 const paginator = new TablePaginator({
   containerId: 'tablePagination',
-  onPageChange: () => renderTable(lastFilteredReportes),
+  onPageChange: () => {
+    if (vistaActual === 'solicitudes') {
+      renderSolicitudesTable(allSolicitudes);
+    } else {
+      renderTable(lastFilteredReportes);
+    }
+  },
   storageKey: 'paginator_reportes',
+});
+
+const paginatorSolicitudes = new TablePaginator({
+  containerId: 'tablePagination',
+  onPageChange: () => renderSolicitudesTable(allSolicitudes),
+  storageKey: 'paginator_solicitudes',
 });
 
 const PENCIL_ICON = `
@@ -101,10 +118,25 @@ function formatStatusLabel(value) {
 function getPriorityRank(estatus) {
   const s = String(estatus || '').trim().toLowerCase();
   if (isAtendido(s)) return 0;
-  if (s === 'en espera') return 1;    // Nivel mÃ¡s bajo
+  if (s === 'en espera') return 1;    // Nivel más bajo
   if (s === 'pendiente') return 2;    // Luego pendientes
   if (s === 'urgente') return 3;      // Luego urgente
-  return 4;                           // Hasta arriba: los que digan otro (o personalizado)
+  return 4;                           // Hasta arriba: Otro(...)
+}
+
+function sortReportesByHierarchy(lista) {
+  return lista.sort((a, b) => {
+    const rankA = getPriorityRank(a.estatus);
+    const rankB = getPriorityRank(b.estatus);
+    if (rankA !== rankB) {
+      return rankB - rankA; // Mayor jerarquía primero (4: Otro, 3: Urgente, 2: Pendiente, 1: En espera, 0: Atendido)
+    }
+    // Mismo nivel de estatus: ordenar por fecha (más antiguo primero si es pendiente/urgente/otro, o más reciente)
+    const fa = a.fecha || '9999-99-99';
+    const fb = b.fecha || '9999-99-99';
+    if (fa !== fb) return fa.localeCompare(fb);
+    return (a.folio || '').localeCompare(b.folio || '');
+  });
 }
 
 function openAttendModal(id) {
@@ -134,11 +166,11 @@ function openDetalleModal(id) {
 
   const statusGroup = getStatusGroup(r.estatus);
   const statusLabel = formatStatusLabel(r.estatus);
-  const fechaFmt = fd(r.fecha) || 'â€”';
+  const fechaFmt = fd(r.fecha) || '—';
   const domParts = [];
   if (r.direccion) domParts.push(r.direccion);
   if (r.colonia_comunidad) domParts.push(`${r.colonia_comunidad}`);
-  const domicilio = domParts.join(', ') || 'â€”';
+  const domicilio = domParts.join(', ') || '—';
 
   content.innerHTML = `
     <div class="detail-item">
@@ -154,48 +186,48 @@ function openDetalleModal(id) {
       <span class="detail-value">${fechaFmt}</span>
     </div>
     <div class="detail-item">
-      <span class="detail-label">Personal que atendiÃ³</span>
-      <span class="detail-value">${esc(r.atendio || 'â€”')}</span>
+      <span class="detail-label">Personal que atendió</span>
+      <span class="detail-value">${esc(r.atendio || '—')}</span>
     </div>
     <div class="detail-item">
       <span class="detail-label">Usuario / Solicitante</span>
-      <span class="detail-value"><strong>${esc(r.usuario || 'â€”')}</strong></span>
+      <span class="detail-value"><strong>${esc(r.usuario || '—')}</strong></span>
     </div>
     <div class="detail-item">
-      <span class="detail-label">TelÃ©fono de contacto</span>
-      <span class="detail-value">${esc(r.telefono || 'â€”')}</span>
+      <span class="detail-label">Teléfono de contacto</span>
+      <span class="detail-value">${esc(r.telefono || '—')}</span>
     </div>
     <div class="detail-item">
       <span class="detail-label">Tipo de localidad</span>
       <span class="detail-value">${esc(r.tipo_localidad || 'Cabecera municipal (Valle de Santiago)')}</span>
     </div>
     <div class="detail-item-full detail-item">
-      <span class="detail-label">DirecciÃ³n y Colonia</span>
+      <span class="detail-label">Dirección y Colonia</span>
       <span class="detail-value">${esc(domicilio)}</span>
     </div>
     <div class="detail-item">
-      <span class="detail-label">Entre quÃ© calles</span>
-      <span class="detail-value">${esc(r.entre_calles || 'â€”')}</span>
+      <span class="detail-label">Entre qué calles</span>
+      <span class="detail-value">${esc(r.entre_calles || '—')}</span>
     </div>
     <div class="detail-item">
       <span class="detail-label">Referencias</span>
-      <span class="detail-value">${esc(r.referencias || 'â€”')}</span>
+      <span class="detail-value">${esc(r.referencias || '—')}</span>
     </div>
     <div class="detail-item">
-      <span class="detail-label">NÃºmero de lÃ¡mparas</span>
+      <span class="detail-label">Número de lámparas</span>
       <span class="detail-value"><strong>${r.numero_lamparas || 1}</strong></span>
     </div>
     <div class="detail-item">
-      <span class="detail-label">Tipo de lÃ¡mpara</span>
-      <span class="detail-value">${esc(r.tipo_lampara || 'â€”')}</span>
+      <span class="detail-label">Tipo de lámpara</span>
+      <span class="detail-value">${esc(r.tipo_lampara || '—')}</span>
     </div>
     <div class="detail-item-full detail-item">
       <span class="detail-label">Tipo de falla</span>
-      <span class="detail-value">${esc(r.tipo_falla || 'â€”')}</span>
+      <span class="detail-value">${esc(r.tipo_falla || '—')}</span>
     </div>
     <div class="detail-item-full detail-item">
       <span class="detail-label">Observaciones</span>
-      <span class="detail-value">${esc(r.observaciones || 'â€”')}</span>
+      <span class="detail-value">${esc(r.observaciones || '—')}</span>
     </div>
   `;
 
@@ -335,11 +367,11 @@ function renderTable(reportes) {
 }
 
 /* --------------------------------------------------------------------------
-   CÃ¡lculo de dÃ­as hÃ¡biles y actualizaciÃ³n dinÃ¡mica de estatus
-   - 0 a 4 dÃ­as hÃ¡biles: "En espera"
-   - 5 a 9 dÃ­as hÃ¡biles: "Pendiente"
-   - 10+ dÃ­as hÃ¡biles:   "Urgente"
-   (Sin contar fines de semana ni dÃ­as inhÃ¡biles oficiales/municipales activos)
+   Cálculo de días hábiles y actualización dinámica de estatus
+   - 0 a 4 días hábiles: "En espera"
+   - 5 a 9 días hábiles: "Pendiente"
+   - 10+ días hábiles:   "Urgente"
+   (Sin contar fines de semana ni días inhábiles oficiales/municipales activos)
    -------------------------------------------------------------------------- */
 let currentHolidaysSet = null;
 
@@ -361,7 +393,7 @@ async function updateReportesStatusByBusinessDays(reportesList, todayIso, holida
   for (const r of reportesList) {
     const s = String(r.estatus || '').trim();
     const lower = s.toLowerCase();
-    // No modificar si ya estÃ¡ atendido ni si es un estatus manual "Otro(...)"
+    // No modificar si ya está atendido ni si es un estatus manual "Otro(...)"
     if (lower === 'atendido' || lower === 'atendida' || lower.startsWith('otro')) {
       continue;
     }
@@ -381,14 +413,14 @@ async function updateReportesStatusByBusinessDays(reportesList, todayIso, holida
       try {
         await saveReporte(r);
       } catch (err) {
-        console.warn('Error al actualizar estatus por dÃ­as hÃ¡biles:', err);
+        console.warn('Error al actualizar estatus por días hábiles:', err);
       }
     }
   }
 }
 
 /* --------------------------------------------------------------------------
-   VISTA DE IMPRESIÃ“N OFICIAL: DiseÃ±o tabular con secciones prioritarias
+   VISTA DE IMPRESIÓN OFICIAL: Diseño tabular con secciones prioritarias
    -------------------------------------------------------------------------- */
 function renderPrintDocument(reportes) {
   const container = $('reportesPrintContainer');
@@ -403,15 +435,18 @@ function renderPrintDocument(reportes) {
     $('printDate').textContent = todayFmt;
   }
 
-  // Separar los reportes en tablas por estatus e importancia:
-  // 1) Estatus "Otro" (aparece hasta arriba)
-  // 2) Estatus "Urgente" (arriba de los de dÃ­as anteriores)
-  // 3) DÃ­as anteriores (Pendientes / En espera con fecha < hoy)
-  // 4) Del dÃ­a (Pendientes / En espera generados hoy)
+  // Separar los reportes en listas según la estricta jerarquía de estatus:
+  // 1) Solicitudes de lámparas (arriba del todo)
+  // 2) Estatus "Otro"
+  // 3) Estatus "Urgente"
+  // 4) Estatus "Pendiente" (tanto de días anteriores como del día)
+  // 5) Estatus "En espera" (tanto de días anteriores como del día)
+  // 6) Estatus "Atendido" (si el filtro actual incluye atendidos)
   const reportesOtro = [];
   const reportesUrgente = [];
-  const anteriores = [];
-  const delDia = [];
+  const reportesPendiente = [];
+  const reportesEnEspera = [];
+  const reportesAtendido = [];
 
   reportes.forEach((r) => {
     const daysAgo = getDaysAgo(r.fecha, todayIso);
@@ -422,65 +457,55 @@ function renderPrintDocument(reportes) {
       reportesOtro.push(withDays);
     } else if (grp === 'urgente') {
       reportesUrgente.push(withDays);
-    } else if (daysAgo > 0) {
-      anteriores.push(withDays);
+    } else if (grp === 'pendiente') {
+      reportesPendiente.push(withDays);
+    } else if (grp === 'atendido') {
+      reportesAtendido.push(withDays);
     } else {
-      delDia.push(withDays);
+      reportesEnEspera.push(withDays);
     }
   });
 
-  // Ordenar "Otro": del mÃ¡s antiguo al mÃ¡s reciente
-  reportesOtro.sort((a, b) => {
+  // Ordenar cada grupo: de más antiguo a más reciente por fecha
+  const sortByDateAsc = (a, b) => {
     const da = a.fecha || '9999-99-99';
     const db = b.fecha || '9999-99-99';
     if (da !== db) return da.localeCompare(db);
     return (a.folio || '').localeCompare(b.folio || '');
-  });
+  };
 
-  // Ordenar "Urgentes": del mÃ¡s antiguo al mÃ¡s reciente
-  reportesUrgente.sort((a, b) => {
-    const da = a.fecha || '9999-99-99';
-    const db = b.fecha || '9999-99-99';
-    if (da !== db) return da.localeCompare(db);
-    return (a.folio || '').localeCompare(b.folio || '');
-  });
-
-  // Ordenar anteriores: del mÃ¡s antiguo al mÃ¡s reciente
-  anteriores.sort((a, b) => {
-    const da = a.fecha || '9999-99-99';
-    const db = b.fecha || '9999-99-99';
-    if (da !== db) return da.localeCompare(db);
-    return (a.folio || '').localeCompare(b.folio || '');
-  });
-
-  // Ordenar los del dÃ­a por folio
-  delDia.sort((a, b) => {
-    return (a.folio || '').localeCompare(b.folio || '');
-  });
+  reportesOtro.sort(sortByDateAsc);
+  reportesUrgente.sort(sortByDateAsc);
+  reportesPendiente.sort(sortByDateAsc);
+  reportesEnEspera.sort(sortByDateAsc);
+  reportesAtendido.sort(sortByDateAsc);
 
   // Totales oficiales para el encabezado
   const total = reportes.length;
   const totalOtro = reportesOtro.length;
   const totalUrgente = reportesUrgente.length;
-  const totalAnteriores = anteriores.length;
-  const totalDelDia = delDia.length;
+  const totalPendiente = reportesPendiente.length;
+  const totalEnEspera = reportesEnEspera.length;
 
   if ($('printTotalSummary')) {
     const parts = [];
+    if (allSolicitudes && allSolicitudes.length > 0) parts.push(`${allSolicitudes.length} solicitudes`);
     if (totalOtro > 0) parts.push(`${totalOtro} otro`);
     if (totalUrgente > 0) parts.push(`${totalUrgente} urgentes`);
-    if (totalAnteriores > 0) parts.push(`${totalAnteriores} de dÃ­as anteriores`);
-    if (totalDelDia > 0 || parts.length === 0) parts.push(`${totalDelDia} del dÃ­a`);
+    if (totalPendiente > 0) parts.push(`${totalPendiente} pendientes`);
+    if (totalEnEspera > 0) parts.push(`${totalEnEspera} en espera`);
     $('printTotalSummary').textContent = `Total: ${total} reportes (${parts.join(', ')})`;
   }
 
-  // Contadores de la tabla en pantalla
-  const totalLamparas = reportes.reduce((acc, r) => acc + (parseInt(r.numero_lamparas, 10) || 1), 0);
-  if ($('lblTotal')) $('lblTotal').textContent = total;
-  if ($('lblLamparas')) $('lblLamparas').textContent = totalLamparas;
+  // Contadores de la tabla en pantalla (solo si estamos en vista de reportes)
+  if (vistaActual === 'reportes') {
+    const totalLamparas = reportes.reduce((acc, r) => acc + (parseInt(r.numero_lamparas, 10) || 1), 0);
+    if ($('lblTotal')) $('lblTotal').textContent = total;
+    if ($('lblLamparas')) $('lblLamparas').textContent = totalLamparas;
+  }
 
-  if (total === 0) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No hay reportes para imprimir.</div></div>`;
+  if (total === 0 && (!allSolicitudes || allSolicitudes.length === 0)) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No hay reportes ni solicitudes para imprimir.</div></div>`;
     return;
   }
 
@@ -489,24 +514,24 @@ function renderPrintDocument(reportes) {
       <tr class="print-table-subhead">
         <th class="th-folio">FOLIO</th>
         <th class="th-fecha">FECHA</th>
-        <th class="th-solicitante">SOLICITANTE / TELÃ‰FONO</th>
+        <th class="th-solicitante">SOLICITANTE / TELÉFONO</th>
         <th class="th-domicilio">DOMICILIO / ENTRE CALLES</th>
-        <th class="th-lamparas">LÃMPARAS / TIPO</th>
+        <th class="th-lamparas">LÁMPARAS / TIPO</th>
         <th class="th-falla">FALLA / REFERENCIAS</th>
       </tr>
     </thead>
   `;
 
   const renderPrintRow = (r, isAnterior) => {
-    const fechaFmt = fd(r.fecha) || 'â€”';
-    const solicitante = esc(r.usuario || 'â€”');
-    const telefono = r.telefono ? `Tel. ${esc(r.telefono)}` : 'Tel. â€”';
+    const fechaFmt = fd(r.fecha) || '—';
+    const solicitante = esc(r.usuario || '—');
+    const telefono = r.telefono ? `Tel. ${esc(r.telefono)}` : 'Tel. —';
 
     // Domicilio completo y Entre calles
     const domParts = [];
     if (r.direccion) domParts.push(r.direccion);
     if (r.colonia_comunidad) domParts.push(`${r.colonia_comunidad}`);
-    const domicilio = domParts.join(', ') || 'â€”';
+    const domicilio = domParts.join(', ') || '—';
 
     let entreCalles = r.entre_calles ? r.entre_calles.trim() : '';
     if (entreCalles) {
@@ -514,27 +539,27 @@ function renderPrintDocument(reportes) {
         entreCalles = `Entre ${entreCalles}`;
       }
     } else {
-      entreCalles = 'â€”';
+      entreCalles = '—';
     }
 
-    // Cantidad de lÃ¡mparas y tipo
+    // Cantidad de lámparas y tipo
     const cant = parseInt(r.numero_lamparas, 10) || 1;
-    const cantText = cant === 1 ? '1 lÃ¡mpara' : `${cant} lÃ¡mparas`;
-    const tipoLampara = r.tipo_lampara || 'â€”';
+    const cantText = cant === 1 ? '1 lámpara' : `${cant} lámparas`;
+    const tipoLampara = r.tipo_lampara || '—';
 
     // Falla y referencias
-    const falla = esc(r.tipo_falla || 'â€”');
+    const falla = esc(r.tipo_falla || '—');
     let refText = r.referencias ? r.referencias.trim() : '';
     if (refText) {
       if (!/^ref\b/i.test(refText)) {
         refText = `Ref. ${refText}`;
       }
     } else {
-      refText = 'Ref. â€”';
+      refText = 'Ref. —';
     }
 
     const fechaCellHtml = isAnterior && r._daysAgo > 0
-      ? `<div class="print-fecha-val">${fechaFmt}</div><div class="print-ago-text">hace ${r._daysAgo} ${r._daysAgo === 1 ? 'dÃ­a' : 'dÃ­as'}</div>`
+      ? `<div class="print-fecha-val">${fechaFmt}</div><div class="print-ago-text">hace ${r._daysAgo} ${r._daysAgo === 1 ? 'día' : 'días'}</div>`
       : `<div class="print-fecha-val">${fechaFmt}</div>`;
 
     const obsText = (r.observaciones || '').trim();
@@ -575,7 +600,67 @@ function renderPrintDocument(reportes) {
 
   let sectionsHtml = '';
 
-  // 1. SecciÃ³n: OTRO (se agrupa y muestra el texto del nuevo input como tÃ­tulo)
+  // 0. Sección: SOLICITUDES DE LÁMPARAS (Aparece hasta arriba si hay registradas)
+  if (allSolicitudes && allSolicitudes.length > 0) {
+    const solicitudesPrintRows = allSolicitudes.map((s) => {
+      const fechaFmt = fd(s.fecha_solicitud) || '—';
+      const solicitante = esc(s.nombre_solicitante || '—');
+      const cant = parseInt(s.cantidad_lamparas, 10) || 1;
+      const cantText = cant === 1 ? '1 lámpara' : `${cant} lámparas`;
+      const tipoLoc = esc(s.tipo_localidad || '—');
+      const descText = esc(s.descripcion || '—');
+      const obsText = (s.observaciones || '').trim();
+
+      const obsRow = obsText
+        ? `
+          <tr class="print-row-observaciones print-row-dia">
+            <td colspan="6" class="col-observaciones">
+              <span class="print-obs-label">Observaciones:</span> <span class="print-obs-text">${esc(obsText)}</span>
+            </td>
+          </tr>
+        `
+        : '';
+
+      return `
+        <tr class="print-row-dia ${obsText ? 'has-observaciones' : ''}">
+          <td class="col-folio"><span class="badge-status badge-status-espera" style="font-size:10px;padding:2px 4px;">Solicitud</span></td>
+          <td class="col-fecha"><div class="print-fecha-val">${fechaFmt}</div></td>
+          <td class="col-solicitante">
+            <div class="print-title-bold">${solicitante}</div>
+            <div class="print-sub-text">${tipoLoc}</div>
+          </td>
+          <td class="col-domicilio">
+            <div class="print-title-normal">${descText}</div>
+          </td>
+          <td class="col-lamparas">
+            <div class="print-title-normal">${cantText}</div>
+            <div class="print-sub-text">Instalación nueva</div>
+          </td>
+          <td class="col-falla">
+            <div class="print-title-bold"><span class="badge-status badge-status-espera" style="display:inline-block;">Solicitudes de lámparas</span></div>
+            <div class="print-sub-text">${esc(s.estatus || 'En espera')}</div>
+          </td>
+        </tr>
+        ${obsRow}
+      `;
+    }).join('');
+
+    sectionsHtml += `
+      <div class="print-section print-section-otro">
+        <div class="print-section-header-dark" style="background-color: #2c3e50;">
+          SOLICITUDES DE LÁMPARAS (${allSolicitudes.length} ${allSolicitudes.length === 1 ? 'SOLICITUD' : 'SOLICITUDES'})
+        </div>
+        <table class="print-reports-table">
+          ${theadHtml}
+          <tbody>
+            ${solicitudesPrintRows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // 1. Sección: OTRO (se agrupa y muestra el texto del nuevo input como título)
   if (reportesOtro.length > 0) {
     const gruposOtro = new Map();
     reportesOtro.forEach((r) => {
@@ -604,11 +689,11 @@ function renderPrintDocument(reportes) {
     });
   }
 
-  // 2. SecciÃ³n: URGENTES (arriba de los de dÃ­as anteriores)
+  // 2. Sección: URGENTES (arriba de pendientes)
   if (reportesUrgente.length > 0) {
     sectionsHtml += `
       <div class="print-section print-section-urgente">
-        <div class="print-section-header-dark">
+        <div class="print-section-header-dark" style="background-color: #c0392b;">
           URGENTES (${reportesUrgente.length} ${reportesUrgente.length === 1 ? 'REPORTE' : 'REPORTES'})
         </div>
         <table class="print-reports-table">
@@ -621,42 +706,51 @@ function renderPrintDocument(reportes) {
     `;
   }
 
-  // 3. SecciÃ³n: PENDIENTES DE DÃAS ANTERIORES
-  const viendoAtendidos = ($('filterEstatus')?.value || 'sin_atender') === 'atendido';
-  const tituloAnteriores = viendoAtendidos
-    ? `ATENDIDOS DE DÃAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'REPORTE' : 'REPORTES'}, DEL MÃS ANTIGUO AL MÃS RECIENTE)`
-    : `PENDIENTES DE DÃAS ANTERIORES (${anteriores.length} ${anteriores.length === 1 ? 'REPORTE' : 'REPORTES'}, DEL MÃS ANTIGUO AL MÃS RECIENTE) - ATENCIÃ“N PRIORITARIA`;
-
-  if (anteriores.length > 0) {
+  // 3. Sección: PENDIENTES
+  if (reportesPendiente.length > 0) {
     sectionsHtml += `
       <div class="print-section print-section-anteriores">
-        <div class="print-section-header-dark">
-          ${tituloAnteriores}
+        <div class="print-section-header-dark" style="background-color: #d35400;">
+          PENDIENTES (${reportesPendiente.length} ${reportesPendiente.length === 1 ? 'REPORTE' : 'REPORTES'})
         </div>
         <table class="print-reports-table">
           ${theadHtml}
           <tbody>
-            ${anteriores.map((r) => renderPrintRow(r, true)).join('')}
+            ${reportesPendiente.map((r) => renderPrintRow(r, r._daysAgo > 0)).join('')}
           </tbody>
         </table>
       </div>
     `;
   }
 
-  // 4. SecciÃ³n: REPORTES DEL DÃA
-  if (delDia.length > 0 || (reportesOtro.length === 0 && reportesUrgente.length === 0 && anteriores.length === 0)) {
+  // 4. Sección: EN ESPERA (hasta el último de los activos)
+  if (reportesEnEspera.length > 0) {
     sectionsHtml += `
       <div class="print-section print-section-dia">
         <div class="print-section-header-gray">
-          REPORTES DEL DÃA ${todayFmt} (${delDia.length} ${delDia.length === 1 ? 'REPORTE' : 'REPORTES'})
+          EN ESPERA (${reportesEnEspera.length} ${reportesEnEspera.length === 1 ? 'REPORTE' : 'REPORTES'})
         </div>
         <table class="print-reports-table">
           ${theadHtml}
           <tbody>
-            ${delDia.length > 0
-        ? delDia.map((r) => renderPrintRow(r, false)).join('')
-        : `<tr><td colspan="6" class="print-empty-row">No hay reportes registrados generados el dÃ­a de hoy.</td></tr>`
-      }
+            ${reportesEnEspera.map((r) => renderPrintRow(r, r._daysAgo > 0)).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // 5. Sección: ATENDIDOS (si se está filtrando o existen atendidos)
+  if (reportesAtendido.length > 0) {
+    sectionsHtml += `
+      <div class="print-section print-section-dia">
+        <div class="print-section-header-dark" style="background-color: #27ae60;">
+          ATENDIDOS (${reportesAtendido.length} ${reportesAtendido.length === 1 ? 'REPORTE' : 'REPORTES'})
+        </div>
+        <table class="print-reports-table">
+          ${theadHtml}
+          <tbody>
+            ${reportesAtendido.map((r) => renderPrintRow(r, r._daysAgo > 0)).join('')}
           </tbody>
         </table>
       </div>
@@ -667,10 +761,152 @@ function renderPrintDocument(reportes) {
 }
 
 /* --------------------------------------------------------------------------
-   Filtros y bÃºsqueda en tiempo real
+   VISTA DE SOLICITUDES DE LÁMPARAS
+   -------------------------------------------------------------------------- */
+const PENCIL_SOL_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 20h9"></path>
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+  </svg>
+`;
+
+function renderSolicitudesTable(lista) {
+  const tbody = $('solicitudesTableBody');
+  if (!tbody) return;
+
+  const pageData = paginator.getCurrentSlice(lista);
+
+  if (pageData.length === 0) {
+    const hasQuery = ($('searchInput')?.value || '').trim();
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" class="table-empty-row">
+          ${hasQuery ? 'No se encontraron solicitudes con esa búsqueda.' : 'No hay solicitudes de instalación de lámparas registradas.'}
+        </td>
+      </tr>
+    `;
+    paginator.update(lista.length);
+    return;
+  }
+
+  tbody.innerHTML = pageData.map((s) => {
+    const fechaFmt = fd(s.fecha_solicitud) || '—';
+    const statusGroup = (() => {
+      const v = String(s.estatus || '').trim().toLowerCase();
+      if (v === 'atendido' || v === 'atendida') return 'atendido';
+      if (v === 'urgente') return 'urgente';
+      if (v === 'pendiente') return 'pendiente';
+      return 'espera';
+    })();
+    return `
+      <tr>
+        <td class="td-datetime">${fechaFmt}</td>
+        <td><strong>${esc(s.nombre_solicitante || '—')}</strong></td>
+        <td>${esc(s.tipo_localidad || '—')}</td>
+        <td class="td-center"><strong>${s.cantidad_lamparas || 1}</strong></td>
+        <td><span class="badge-status badge-status-${statusGroup}">${esc(s.estatus || 'En espera')}</span></td>
+        <td>${esc(s.descripcion || '—')}</td>
+        <td>${esc(s.observaciones || '—')}</td>
+        <td class="td-center">
+          <div class="table-actions">
+            <a class="btn-icon-action" href="solicitudes-lamparas.html?id=${encodeURIComponent(s.id)}" title="Editar solicitud" aria-label="Editar solicitud">${PENCIL_SOL_ICON}</a>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  paginator.update(lista.length);
+}
+
+/* --------------------------------------------------------------------------
+   ALTERNAR ENTRE VISTA DE REPORTES Y SOLICITUDES
+   -------------------------------------------------------------------------- */
+function activarVistaReportes() {
+  vistaActual = 'reportes';
+
+  $('vistaReportes')?.classList.remove('hidden');
+  $('vistaSolicitudes')?.classList.add('hidden');
+
+  const filterEl = $('filterEstatus');
+  if (filterEl) filterEl.style.display = '';
+  const pillEl = $('pillLamparas');
+  if (pillEl) pillEl.style.display = '';
+
+  const lbl = $('lblToggleVista');
+  if (lbl) lbl.textContent = 'Solicitudes';
+  if ($('pageViewTitle')) $('pageViewTitle').textContent = 'REGISTRO DE REPORTES';
+  if ($('pageViewDesc'))  $('pageViewDesc').textContent  = 'Consulta e impresión de reportes de fallas de Alumbrado Público.';
+
+  paginator.resetPage();
+  applyFilterAndRender();
+}
+
+async function activarVistaSolicitudes() {
+  vistaActual = 'solicitudes';
+
+  $('vistaReportes')?.classList.add('hidden');
+  $('vistaSolicitudes')?.classList.remove('hidden');
+
+  const filterEl = $('filterEstatus');
+  if (filterEl) filterEl.style.display = 'none';
+  const pillEl = $('pillLamparas');
+  if (pillEl) pillEl.style.display = 'none';
+
+  const lbl = $('lblToggleVista');
+  if (lbl) lbl.textContent = 'Reportes';
+  if ($('pageViewTitle')) $('pageViewTitle').textContent = 'SOLICITUDES DE INSTALACIÓN DE LÁMPARAS';
+  if ($('pageViewDesc'))  $('pageViewDesc').textContent  = 'Consulta de solicitudes de instalación de nuevas lámparas.';
+
+  if ($('lblTotal')) $('lblTotal').textContent = '...';
+
+  try {
+    allSolicitudes = await getAllSolicitudesLamparas();
+  } catch (err) {
+    console.error('[solicitudes] Error al cargar:', err);
+    allSolicitudes = [];
+  }
+
+  // Búsqueda en tiempo real sobre solicitudes
+  const query = ($('searchInput')?.value || '').trim().toLowerCase();
+  let lista = allSolicitudes;
+  if (query) {
+    lista = allSolicitudes.filter((s) =>
+      [s.nombre_solicitante, s.tipo_localidad, s.descripcion, s.observaciones, s.estatus]
+        .some((v) => (v || '').toLowerCase().includes(query))
+    );
+  }
+
+  if ($('lblTotal')) $('lblTotal').textContent = lista.length;
+
+  paginator.resetPage();
+  renderSolicitudesTable(lista);
+  // Regenerar vista de impresión con solicitudes arriba
+  renderPrintDocument(allReportes);
+}
+
+/* --------------------------------------------------------------------------
+   Filtros y búsqueda en tiempo real
    -------------------------------------------------------------------------- */
 function applyFilterAndRender() {
   const query = ($('searchInput')?.value || '').trim().toLowerCase();
+
+  // Si estamos viendo solicitudes, filtrar y renderizar solicitudes
+  if (vistaActual === 'solicitudes') {
+    let lista = allSolicitudes;
+    if (query) {
+      lista = allSolicitudes.filter((s) =>
+        [s.nombre_solicitante, s.tipo_localidad, s.descripcion, s.observaciones, s.estatus]
+          .some((v) => (v || '').toLowerCase().includes(query))
+      );
+    }
+    if ($('lblTotal')) $('lblTotal').textContent = lista.length;
+    paginator.resetPage();
+    renderSolicitudesTable(lista);
+    return;
+  }
+
+  // Vista de reportes
   const filtro = $('filterEstatus')?.value || 'sin_atender';
 
   let filtered = allReportes.filter((r) => {
@@ -690,13 +926,16 @@ function applyFilterAndRender() {
     });
   }
 
+  // Asegurar que la lista filtrada mantenga la jerarquía de estatus
+  sortReportesByHierarchy(filtered);
+
   paginator.resetPage();
   renderTable(filtered);
   renderPrintDocument(filtered);
 }
 
 /* --------------------------------------------------------------------------
-   GENERAR INFORME ESTADÃSTICO
+   GENERAR INFORME ESTADÍSTICO
    -------------------------------------------------------------------------- */
 function openModalInforme() {
   const hoy = new Date();
@@ -711,6 +950,10 @@ function openModalInforme() {
 
 function closeModalInforme() {
   $('modalGenerarInforme')?.classList.add('hidden');
+}
+
+function closeTipoReporteModal() {
+  $('modalTipoReporte')?.classList.add('hidden');
 }
 
 function generarInforme() {
@@ -748,7 +991,7 @@ function generarInforme() {
 
 
 /* --------------------------------------------------------------------------
-   InicializaciÃ³n
+   Inicialización
    -------------------------------------------------------------------------- */
 window.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -761,35 +1004,41 @@ window.addEventListener('DOMContentLoaded', async () => {
   hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
   const todayIso = hoy.toISOString().slice(0, 10);
 
-  // Sincronizar dÃ­as festivos oficiales y asuetos municipales en BD
+  // Sincronizar días festivos oficiales y asuetos municipales en BD
   try {
     await syncOfficialHolidays();
   } catch (err) {
-    console.warn('Error al sincronizar dÃ­as oficiales:', err);
+    console.warn('Error al sincronizar días oficiales:', err);
   }
 
   try {
     currentHolidaysSet = await getActiveHolidaysSet();
   } catch (err) {
-    console.warn('Error al obtener dÃ­as festivos activos:', err);
+    console.warn('Error al obtener días festivos activos:', err);
     currentHolidaysSet = new Set();
   }
 
   try {
     allReportes = await getAllReportes();
-    // Actualizar automÃ¡ticamente estatus segÃºn dÃ­as hÃ¡biles transcurridos
-    await updateReportesStatusByBusinessDays(allReportes, todayIso, currentHolidaysSet);
   } catch (err) {
     console.error('Error al cargar reportes:', err);
     allReportes = [];
   }
 
-  // Ordenar mÃ¡s reciente primero para la tabla en pantalla
-  allReportes.sort((a, b) => {
-    const ka = (b.fecha || '') + (b.created_at || '');
-    const kb = (a.fecha || '') + (a.created_at || '');
-    return ka.localeCompare(kb);
-  });
+  // Pre-cargar solicitudes de instalación para estadísticas y vista de impresión
+  try {
+    allSolicitudes = await getAllSolicitudesLamparas();
+  } catch (err) {
+    console.warn('Error al cargar solicitudes iniciales:', err);
+    allSolicitudes = [];
+  }
+
+  // Ordenar por estricta jerarquía de estatus para la pantalla:
+  // 1) Otro (mayor jerarquía)
+  // 2) Urgente
+  // 3) Pendiente
+  // 4) En espera (hasta el final)
+  sortReportesByHierarchy(allReportes);
 
   applyFilterAndRender();
   attachInputNormalizers(document);
@@ -815,11 +1064,36 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (e.target === $('modalDetalleReporte')) closeDetalleModal();
   });
 
+  $('btnNuevoReporte')?.addEventListener('click', () => {
+    $('modalTipoReporte')?.classList.remove('hidden');
+  });
+
+  // Botón para alternar entre vista de Reportes y Solicitudes
+  $('btnToggleVista')?.addEventListener('click', () => {
+    if (vistaActual === 'reportes') {
+      activarVistaSolicitudes();
+    } else {
+      activarVistaReportes();
+    }
+  });
+
+  $('btnTipoReporteFalla')?.addEventListener('click', () => {
+    window.location.href = 'reportes.html';
+  });
+  $('btnTipoSolicitudLampara')?.addEventListener('click', () => {
+    window.location.href = 'solicitudes-lamparas.html';
+  });
+  $('btnCerrarTipoReporteX')?.addEventListener('click', closeTipoReporteModal);
+  $('modalTipoReporte')?.addEventListener('click', (e) => {
+    if (e.target === $('modalTipoReporte')) closeTipoReporteModal();
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!$('modalAtendido')?.classList.contains('hidden')) closeAttendModal();
       if (!$('modalOpcionesAtendido')?.classList.contains('hidden')) closeOpcionesModal();
       if (!$('modalDetalleReporte')?.classList.contains('hidden')) closeDetalleModal();
+      if (!$('modalTipoReporte')?.classList.contains('hidden')) closeTipoReporteModal();
     }
   });
 
@@ -827,7 +1101,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.print();
   });
 
-  // BotÃ³n: Generar informe estadÃ­stico
+  // Botón: Generar informe estadístico
   $('btnGenerarInforme')?.addEventListener('click', openModalInforme);
   $('btnCerrarInformeX')?.addEventListener('click', closeModalInforme);
   $('btnCancelarInforme')?.addEventListener('click', closeModalInforme);
@@ -836,18 +1110,18 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (e.target === $('modalGenerarInforme')) closeModalInforme();
   });
 
-  // Sidebar: Google Sheets â†’ navega a personal.html
+  // Sidebar: Google Sheets → navega a personal.html
   $('btnSidebarGoogleSheets')?.addEventListener('click', () => {
     window.location.href = 'personal.html';
   });
 
-  // Reintento automÃ¡tico de sincronizaciÃ³n al volver internet
+  // Reintento automático de sincronización al volver internet
   window.addEventListener('online', () => {
-    console.info('[registros-reportes] ConexiÃ³n restaurada, procesando cola de reportes...');
+    console.info('[registros-reportes] Conexión restaurada, procesando cola de reportes...');
     processSyncQueue('reportes');
   });
 
-  // Toggle de submenÃº Herramientas en barra lateral: navegar a herramientas.html
+  // Toggle de submenú Herramientas en barra lateral: navegar a herramientas.html
   // (el toggle lo maneja herramientas.html con su script inline)
 });
 

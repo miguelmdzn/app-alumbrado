@@ -90,6 +90,14 @@ export {
   getOfficialMexicanHolidays,
 } from './database/repositories/diasInhabiles.js';
 
+// ---- Repositorio: solicitudes de instalación de lámparas --------------------
+export {
+  saveSolicitudLampara,
+  getAllSolicitudesLamparas,
+  getSolicitudLamparaById,
+  deleteSolicitudLampara,
+} from './database/repositories/solicitudesLamparas.js';
+
 // ---- Repositorio: localidades (colonias y comunidades del municipio) --------
 export {
   getAllLocalidades,

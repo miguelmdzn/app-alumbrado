@@ -425,12 +425,14 @@ function closeModalGoogleSheets() {
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     await initDatabase();
+    console.info('[personal] initDatabase OK');
   } catch (err) {
     console.warn('Error al conectar base de datos:', err);
   }
 
   try {
     allPersonal = await getAllPersonal();
+    console.info('[personal] getAllPersonal OK — registros:', allPersonal.length, allPersonal.map(p => p.nombres));
   } catch (err) {
     console.error('Error al cargar personal:', err);
     allPersonal = [];

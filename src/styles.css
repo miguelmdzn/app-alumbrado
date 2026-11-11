@@ -1577,6 +1577,16 @@ body {
   justify-content: flex-end;
 }
 
+.tipo-reporte-choices {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.tipo-reporte-choices .btn {
+  width: 100%;
+  justify-content: center;
+}
+
 .td-coord {
   white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

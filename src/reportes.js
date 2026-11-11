@@ -403,7 +403,13 @@ $('reporteForm')?.addEventListener('submit', async (e) => {
   try {
     await saveReporte(reportData);
     showToast('success', editingId ? 'Reporte actualizado correctamente' : 'Reporte guardado correctamente');
+    const wasEditing = !!editingId;
     resetForm();
+    if (wasEditing) {
+      setTimeout(() => {
+        window.location.href = 'registros-reportes.html';
+      }, 1000);
+    }
   } catch (err) {
     console.error('Error al guardar reporte:', err);
     showToast('error', 'Ocurrió un error al guardar el reporte');

@@ -106,6 +106,7 @@ export async function getAllPersonal() {
          ORDER BY CASE WHEN estatus = 'Activo' THEN 0 ELSE 1 END,
                   nombres ASC, apellido1 ASC, created_at DESC;`
       );
+      console.info('[personal] SQLite rows devueltos:', Array.isArray(rows) ? rows.length : typeof rows);
       if (Array.isArray(rows)) {
         if (rows.length === 0) {
           await idbClear(TABLE);
@@ -115,6 +116,8 @@ export async function getAllPersonal() {
     } catch (err) {
       console.error(`[personal] Error al consultar SQLite:`, err);
     }
+  } else {
+    console.warn('[personal] isSQLiteReady() = false → usando IndexedDB');
   }
 
   // 2. Fallback IndexedDB SOLO si SQLite no está disponible o falló la conexión

@@ -256,6 +256,48 @@ const MIGRATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // v10 — Solicitudes de instalación de lámparas (tabla nueva, independiente)
+  // -------------------------------------------------------------------------
+  {
+    version: 10,
+    name: 'create_solicitudes_instalacion_lamparas',
+    up: `
+      CREATE TABLE IF NOT EXISTS solicitudes_instalacion_lamparas (
+        id                  TEXT PRIMARY KEY,
+        nombre_solicitante  TEXT,
+        fecha_solicitud     TEXT,
+        tipo_localidad      TEXT DEFAULT 'Cabecera municipal (Valle de Santiago)',
+        descripcion         TEXT,
+        estatus             TEXT NOT NULL DEFAULT 'En espera',
+        cantidad_lamparas   INTEGER DEFAULT 1,
+        observaciones       TEXT,
+        created_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at          TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_solicitudes_lamparas_fecha
+        ON solicitudes_instalacion_lamparas (fecha_solicitud);
+
+      CREATE INDEX IF NOT EXISTS idx_solicitudes_lamparas_estatus
+        ON solicitudes_instalacion_lamparas (estatus);
+
+      CREATE INDEX IF NOT EXISTS idx_solicitudes_lamparas_tipo_localidad
+        ON solicitudes_instalacion_lamparas (tipo_localidad);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v11 — Agregar colonia_comunidad a solicitudes_instalacion_lamparas
+  // -------------------------------------------------------------------------
+  {
+    version: 11,
+    name: 'add_colonia_comunidad_to_solicitudes',
+    up: `
+      ALTER TABLE solicitudes_instalacion_lamparas ADD COLUMN colonia_comunidad TEXT;
+    `
+  },
+
+  // -------------------------------------------------------------------------
   // → PLANTILLA para futuras tablas — copiar y ajustar
   //
   // {

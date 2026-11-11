@@ -146,12 +146,12 @@
           <!-- Barra superior de navegación y acciones -->
           <header class="app-top-nav">
             <div class="nav-title-group">
-              <h1 class="app-title">Registro de Reportes</h1>
-              <p class="app-desc">Consulta e impresión de reportes de fallas de Alumbrado Público.</p>
+              <h1 class="app-title" id="pageViewTitle">REGISTRO DE REPORTES</h1>
+              <p class="app-desc" id="pageViewDesc">Consulta e impresión de reportes de fallas de Alumbrado Público.</p>
             </div>
 
             <div class="nav-actions">
-              <a href="reportes.html" class="btn btn-secondary btn-nav-link" id="btnBackToForm">
+              <button type="button" class="btn btn-secondary btn-nav-link" id="btnNuevoReporte">
                 <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -159,8 +159,18 @@
                   <line x1="12" y1="18" x2="12" y2="12"></line>
                   <line x1="9" y1="15" x2="15" y2="15"></line>
                 </svg>
-                Nuevo reporte
-              </a>
+                NUEVO REPORTE
+              </button>
+
+              <!-- Botón para alternar entre Reportes y Solicitudes -->
+              <button type="button" class="btn btn-nav-link" id="btnToggleVista" style="background:var(--color-accent,#5c6bc0);color:#fff;border-color:var(--color-accent,#5c6bc0);">
+                <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="9" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="15" cy="12" r="1"></circle>
+                  <path d="M3 5h18M3 19h18"></path>
+                </svg>
+                <span id="lblToggleVista">Solicitudes</span>
+              </button>
 
               <button type="button" class="btn btn-success btn-nav-link" id="btnGenerarInforme">
                 <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -192,6 +202,7 @@
                   <input type="search" id="searchInput"
                     placeholder="Buscar por folio, usuario, colonia, tipo de falla..." class="field-input">
                 </div>
+                <!-- Filtro de estatus: solo visible en vista reportes -->
                 <select id="filterEstatus" class="field-select records-status-select"
                   aria-label="Mostrar reportes por estatus">
                   <option value="sin_atender" selected>SIN ATENDER</option>
@@ -201,11 +212,12 @@
 
               <div class="records-stats-summary">
                 <div class="stat-pill">Total: <strong id="lblTotal">0</strong></div>
-                <div class="stat-pill">Lámparas: <strong id="lblLamparas">0</strong></div>
+                <div class="stat-pill" id="pillLamparas">Lámparas: <strong id="lblLamparas">0</strong></div>
               </div>
             </div>
 
-            <div class="table-responsive">
+            <!-- TABLA DE REPORTES (vista principal) -->
+            <div class="table-responsive" id="vistaReportes">
               <table class="records-table">
                 <thead>
                   <tr>
@@ -227,6 +239,27 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- TABLA DE SOLICITUDES DE LÁMPARAS (vista alternativa, oculta por defecto) -->
+            <div class="table-responsive hidden" id="vistaSolicitudes">
+              <table class="records-table">
+                <thead>
+                  <tr>
+                    <th>Fecha solicitud</th>
+                    <th>Solicitante</th>
+                    <th>Tipo de localidad</th>
+                    <th>Lámparas</th>
+                    <th>Estatus</th>
+                    <th>Descripción</th>
+                    <th>Observaciones</th>
+                    <th class="td-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="solicitudesTableBody">
+                </tbody>
+              </table>
+            </div>
+
             <div class="table-pagination" id="tablePagination"></div>
           </section>
 
@@ -262,6 +295,22 @@
       </main>
     </div>
 
+  </div>
+
+  <!-- Modal: tipo de registro al pulsar Nuevo reporte -->
+  <div id="modalTipoReporte" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-labelledby="modalTipoReporteTitle">
+    <div class="modal-card">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalTipoReporteTitle">Nuevo reporte</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarTipoReporteX" aria-label="Cerrar">&times;</button>
+      </div>
+      <p class="modal-text">¿Es un reporte de falla o una solicitud de lámpara?</p>
+      <div class="modal-actions tipo-reporte-choices">
+        <button type="button" class="btn btn-primary" id="btnTipoReporteFalla">Reporte de falla</button>
+        <button type="button" class="btn btn-secondary" id="btnTipoSolicitudLampara">Solicitud de lámpara</button>
+      </div>
+    </div>
   </div>
 
   <!-- Modal 1: Confirmar atención -->
