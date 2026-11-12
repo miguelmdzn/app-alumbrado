@@ -603,45 +603,31 @@ function renderPrintDocument(reportes) {
   // 0. Sección: SOLICITUDES DE LÁMPARAS (Aparece hasta arriba si hay registradas)
   if (allSolicitudes && allSolicitudes.length > 0) {
     const solicitudesPrintRows = allSolicitudes.map((s) => {
-      const fechaFmt = fd(s.fecha_solicitud) || '—';
       const solicitante = esc(s.nombre_solicitante || '—');
+      const telefono = esc(s.telefono || '—');
+      const colonia = esc(s.colonia_comunidad || '—');
       const cant = parseInt(s.cantidad_lamparas, 10) || 1;
       const cantText = cant === 1 ? '1 lámpara' : `${cant} lámparas`;
-      const tipoLoc = esc(s.tipo_localidad || '—');
       const descText = esc(s.descripcion || '—');
-      const obsText = (s.observaciones || '').trim();
-
-      const obsRow = obsText
-        ? `
-          <tr class="print-row-observaciones print-row-dia">
-            <td colspan="6" class="col-observaciones">
-              <span class="print-obs-label">Observaciones:</span> <span class="print-obs-text">${esc(obsText)}</span>
-            </td>
-          </tr>
-        `
-        : '';
 
       return `
-        <tr class="print-row-dia ${obsText ? 'has-observaciones' : ''}">
-          <td class="col-folio"><span class="badge-status badge-status-espera" style="font-size:10px;padding:2px 4px;">Solicitud</span></td>
-          <td class="col-fecha"><div class="print-fecha-val">${fechaFmt}</div></td>
+        <tr class="print-row-dia">
           <td class="col-solicitante">
             <div class="print-title-bold">${solicitante}</div>
-            <div class="print-sub-text">${tipoLoc}</div>
+          </td>
+          <td>
+            <div class="print-title-normal">${telefono}</div>
           </td>
           <td class="col-domicilio">
-            <div class="print-title-normal">${descText}</div>
+            <div class="print-title-normal">${colonia}</div>
           </td>
           <td class="col-lamparas">
             <div class="print-title-normal">${cantText}</div>
-            <div class="print-sub-text">Instalación nueva</div>
           </td>
-          <td class="col-falla">
-            <div class="print-title-bold"><span class="badge-status badge-status-espera" style="display:inline-block;">Solicitudes de lámparas</span></div>
-            <div class="print-sub-text">${esc(s.estatus || 'En espera')}</div>
+          <td>
+            <div class="print-title-normal">${descText}</div>
           </td>
         </tr>
-        ${obsRow}
       `;
     }).join('');
 
@@ -651,7 +637,15 @@ function renderPrintDocument(reportes) {
           SOLICITUDES DE LÁMPARAS (${allSolicitudes.length} ${allSolicitudes.length === 1 ? 'SOLICITUD' : 'SOLICITUDES'})
         </div>
         <table class="print-reports-table">
-          ${theadHtml}
+          <thead>
+            <tr class="print-table-subhead">
+              <th class="th-solicitante">SOLICITANTE</th>
+              <th class="th-fecha">TELÉFONO</th>
+              <th class="th-domicilio">COLONIA O COMUNIDAD</th>
+              <th class="th-lamparas">CANTIDAD DE LÁMPARAS</th>
+              <th class="th-falla">DESCRIPCIÓN</th>
+            </tr>
+          </thead>
           <tbody>
             ${solicitudesPrintRows}
           </tbody>
