@@ -75,6 +75,23 @@
           <span>Personal</span>
         </a>
 
+        <!-- Opción de primer nivel Lámparas LED -->
+        <a href="lamparas-instaladas.html" class="sidebar-menu-item" id="navSidebarLamparas">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <span>Lámparas LED</span>
+        </a>
+
         <!-- Menú desplegable Herramientas -->
         <div class="sidebar-dropdown-group" id="navGroupHerramientas">
           <a href="herramientas.html" class="sidebar-menu-item sidebar-dropdown-toggle" id="btnToggleHerramientas"
@@ -146,14 +163,14 @@
         <!-- Panel del Formulario de Nuevo Reporte -->
         <form class="panel form-report" id="reporteForm" autocomplete="off">
           <div class="panel-header">
-            <h2 class="panel-title" id="reporteFormTitle">Nuevo Reporte de Falla / Lámpara</h2>
+            <h2 class="panel-title" id="reporteFormTitle">NUEVO REPORTE DE FALLA / SOLICITUD</h2>
           </div>
 
           <div class="form-grid">
             <!-- Fila 1 -->
             <label class="field col-1">
               <span class="field-label">Folio <span class="required">*</span></span>
-              <input type="text" id="folio" required placeholder="Ej. REP-2026-001" class="field-input">
+              <input type="text" id="folio" required placeholder="" class="field-input">
             </label>
 
             <label class="field col-1">
@@ -165,21 +182,19 @@
               <span class="field-label">Nombre del que atiende</span>
               <input type="text" id="atendio" placeholder="" value="MIGUEL MÉNDEZ" class="field-input">
             </label>
-
             <label class="field col-1">
-              <span class="field-label">Teléfono de contacto</span>
-              <input type="tel" id="telefono" placeholder="Ej. 456 123 4567" class="field-input">
+              <span class="field-label">Usuario (Solicitante)</span>
+              <input type="text" id="usuario" placeholder="" class="field-input">
             </label>
+
+
 
             <!-- Fila 2 -->
-            <label class="field col-2">
-              <span class="field-label">Usuario (Solicitante)</span>
-              <input type="text" id="usuario" placeholder="Ej. María López Hernández" class="field-input">
-            </label>
+
 
             <label class="field col-1">
               <span class="field-label">Dirección (Calle y número)</span>
-              <input type="text" id="direccion" placeholder="Ej. Calle Morelos #120" class="field-input">
+              <input type="text" id="direccion" placeholder="" class="field-input">
             </label>
 
             <!-- Tipo de localidad -->
@@ -195,11 +210,15 @@
             <label class="field col-1">
               <span class="field-label">Colonia o comunidad</span>
               <div class="autocomplete-wrapper">
-                <input type="text" id="colonia" placeholder="Ej. Col. Bellavista" class="field-input"
-                  autocomplete="off" aria-autocomplete="list" aria-controls="listColoniaComunidad">
+                <input type="text" id="colonia" placeholder="" class="field-input" autocomplete="off"
+                  aria-autocomplete="list" aria-controls="listColoniaComunidad">
                 <ul id="listColoniaComunidad" class="autocomplete-list" role="listbox" style="display:none;">
                 </ul>
               </div>
+            </label>
+            <label class="field col-1">
+              <span class="field-label">Teléfono de contacto</span>
+              <input type="tel" id="telefono" placeholder="" class="field-input">
             </label>
 
             <!-- Fila 3 -->
@@ -222,7 +241,7 @@
 
             <label class="field col-2 hidden" id="wrapOtroLampara">
               <span class="field-label">Especificar tipo de lámpara <span class="required">*</span></span>
-              <input type="text" id="otroLampara" placeholder="Ej. Solar, Suburbana, etc." class="field-input">
+              <input type="text" id="otroLampara" placeholder="" class="field-input">
             </label>
 
             <!-- Tipo de falla con activación de "Otro" -->
@@ -238,8 +257,7 @@
 
             <label class="field col-2 hidden" id="wrapOtroFalla">
               <span class="field-label">Especificar tipo de falla <span class="required">*</span></span>
-              <input type="text" id="otroFalla" placeholder="Ej. Cable caído, balastro quemado, etc."
-                class="field-input">
+              <input type="text" id="otroFalla" placeholder="" class="field-input">
             </label>
 
             <!-- Estatus con activación de "Otro" -->
@@ -256,27 +274,24 @@
 
             <label class="field col-2 hidden" id="wrapOtroEstatus">
               <span class="field-label">Especificar estatus <span class="required">*</span></span>
-              <input type="text" id="otroEstatus" placeholder="Ej. En revisión, Especial, etc." class="field-input">
+              <input type="text" id="otroEstatus" placeholder="" class="field-input">
             </label>
 
             <!-- Fila 4: Calles y Referencias -->
             <label class="field col-2">
               <span class="field-label">Entre qué calles se encuentra la lámpara</span>
-              <input type="text" id="entreCalles" placeholder="Ej. Entre Zaragoza y 5 de Mayo" class="field-input">
+              <input type="text" id="entreCalles" placeholder="" class="field-input">
             </label>
 
             <label class="field col-2">
               <span class="field-label">Referencias para encontrar la lámpara</span>
-              <input type="text" id="referencias" placeholder="Ej. Frente a la tienda de abarrotes, poste verde"
-                class="field-input">
+              <input type="text" id="referencias" placeholder="" class="field-input">
             </label>
 
             <!-- Fila 5: Observaciones -->
             <label class="field col-4">
               <span class="field-label">Observaciones</span>
-              <textarea id="observaciones" rows="3"
-                placeholder="Información adicional, detalles o notas de seguimiento..."
-                class="field-textarea"></textarea>
+              <textarea id="observaciones" rows="3" placeholder="" class="field-textarea"></textarea>
             </label>
           </div>
 

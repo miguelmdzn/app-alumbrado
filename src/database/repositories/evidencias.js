@@ -45,6 +45,7 @@ function toRecord(report, uuid, refFoto1, refFoto2) {
     fecha_atencion:   report.fecha            || '',
     hora_atencion:    report.hora             || '',
     personal_atendio: report.atendio          || '',
+    personal_instalo: report.personalInstalo  || report.personal_instalo || '',
     turno:            report.turno            || 'Matutino',
     ubicacion:        report.ubicacion        || '',
     latitud:          isValidCoord(report.lat)  ? Number(report.lat) : null,
@@ -64,24 +65,26 @@ function toRecord(report, uuid, refFoto1, refFoto2) {
 // ---------------------------------------------------------------------------
 function toFrontend(r) {
   return {
-    id:        r.id,
-    folio:     r.folio            || '',
-    solicita:  r.solicitante      || '',
-    fecha:     r.fecha_atencion   || '',
-    hora:      r.hora_atencion    || '',
-    atendio:   r.personal_atendio || '',
-    turno:     r.turno            || 'Matutino',
-    ubicacion: r.ubicacion        || '',
-    lat:       isValidCoord(r.latitud)  ? Number(r.latitud)  : null,
-    lon:       isValidCoord(r.longitud) ? Number(r.longitud) : null,
-    alt:       r.altitud          || '',
-    mapsUrl:   r.enlace_maps      || '',
-    accion:    r.observaciones    || '',
-    estatus:   r.estatus          || 'Atendido',
-    tipo:      r.tipo_reporte     || '',
-    fotoRefs:  [r.foto1 || null, r.foto2 || null],
-    fotos:     [r.foto1 || null, r.foto2 || null],
-    createdAt: r.created_at       || null,
+    id:              r.id,
+    folio:           r.folio            || '',
+    solicita:        r.solicitante      || '',
+    fecha:           r.fecha_atencion   || '',
+    hora:            r.hora_atencion    || '',
+    atendio:         r.personal_atendio || '',
+    personalInstalo: r.personal_instalo || '',
+    personal_instalo: r.personal_instalo || '',
+    turno:           r.turno            || 'Matutino',
+    ubicacion:       r.ubicacion        || '',
+    lat:             isValidCoord(r.latitud)  ? Number(r.latitud)  : null,
+    lon:             isValidCoord(r.longitud) ? Number(r.longitud) : null,
+    alt:             r.altitud          || '',
+    mapsUrl:         r.enlace_maps      || '',
+    accion:          r.observaciones    || '',
+    estatus:         r.estatus          || 'Atendido',
+    tipo:            r.tipo_reporte     || '',
+    fotoRefs:        [r.foto1 || null, r.foto2 || null],
+    fotos:           [r.foto1 || null, r.foto2 || null],
+    createdAt:       r.created_at       || null,
   };
 }
 
@@ -118,16 +121,17 @@ export async function saveEvidencia(report) {
       await getSQLite().execute(
         `INSERT OR REPLACE INTO ${TABLE} (
            id, folio, solicitante, fecha_atencion, hora_atencion,
-           personal_atendio, turno, ubicacion, latitud, longitud,
+           personal_atendio, personal_instalo, turno, ubicacion, latitud, longitud,
            altitud, enlace_maps, observaciones, estatus, tipo_reporte,
            foto1, foto2, updated_at
          ) VALUES (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-           $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP
+           $11, $12, $13, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP
          );`,
         [
           record.id, record.folio, record.solicitante,
           record.fecha_atencion, record.hora_atencion, record.personal_atendio,
+          record.personal_instalo,
           record.turno, record.ubicacion, record.latitud, record.longitud,
           record.altitud, record.enlace_maps, record.observaciones,
           record.estatus, record.tipo_reporte, record.foto1, record.foto2,

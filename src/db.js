@@ -107,3 +107,11 @@ export {
   deleteLocalidad,
   findOrCreateLocalidad,
 } from './database/repositories/localidades.js';
+
+// ---- Repositorio: lámparas LED instaladas en campo --------------------------
+export {
+  saveLamparaInstalada,
+  getAllLamparasInstaladas,
+  getLamparaInstaladaById,
+  deleteLamparaInstalada,
+} from './database/repositories/lamparasInstaladas.js';

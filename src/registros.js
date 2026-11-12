@@ -211,6 +211,7 @@ function openDetalleEvidenciaModal(id) {
   if (!content) return;
 
   const atendioFmt = formatAtendioDisplay(r.atendio) || '—';
+  const instaloFmt = formatAtendioDisplay(r.personalInstalo || r.personal_instalo) || '—';
   const fechaFmt = fd(r.fecha) || '—';
   const horaFmt = r.hora ? `${r.hora} hrs` : '—';
   const coords = (r.lat != null && r.lon != null) ? `${r.lat}, ${r.lon}` : '—';
@@ -253,6 +254,10 @@ function openDetalleEvidenciaModal(id) {
     <div class="detail-item" style="grid-column: span 2;">
       <span class="detail-label">Personal que atendió:</span>
       <span class="detail-value"><strong>${esc(atendioFmt)}</strong></span>
+    </div>
+    <div class="detail-item" style="grid-column: span 2;">
+      <span class="detail-label">Personal que instaló:</span>
+      <span class="detail-value"><strong>${esc(instaloFmt)}</strong></span>
     </div>
     <div class="detail-item">
       <span class="detail-label">Tipo de reporte:</span>
@@ -487,7 +492,9 @@ function applyFilterAndRender() {
       const solicita = (r.solicita || '').toLowerCase();
       const atendioRaw = (r.atendio || '').toLowerCase();
       const atendioNom = formatAtendioDisplay(r.atendio).toLowerCase();
-      return folio.includes(query) || tipo.includes(query) || ubicacion.includes(query) || solicita.includes(query) || atendioRaw.includes(query) || atendioNom.includes(query);
+      const instaloRaw = (r.personalInstalo || r.personal_instalo || '').toLowerCase();
+      const instaloNom = formatAtendioDisplay(r.personalInstalo || r.personal_instalo).toLowerCase();
+      return folio.includes(query) || tipo.includes(query) || ubicacion.includes(query) || solicita.includes(query) || atendioRaw.includes(query) || atendioNom.includes(query) || instaloRaw.includes(query) || instaloNom.includes(query);
     });
   }
 

@@ -298,6 +298,62 @@ const MIGRATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // v12 — Agregar telefono a solicitudes_instalacion_lamparas
+  // -------------------------------------------------------------------------
+  {
+    version: 12,
+    name: 'add_telefono_to_solicitudes_lamparas',
+    up: `
+      ALTER TABLE solicitudes_instalacion_lamparas ADD COLUMN telefono TEXT;
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v13 — Tabla de lámparas LED instaladas (registro de instalaciones en campo)
+  // -------------------------------------------------------------------------
+  {
+    version: 13,
+    name: 'create_lamparas_instaladas',
+    up: `
+      CREATE TABLE IF NOT EXISTS lamparas_instaladas (
+        id                TEXT PRIMARY KEY,
+        folio             TEXT,
+        fecha             TEXT,
+        hora              TEXT,
+        tipo_lampara      TEXT,
+        ubicacion         TEXT,
+        latitud           REAL,
+        longitud          REAL,
+        altitud           TEXT,
+        enlace_maps       TEXT,
+        observaciones     TEXT,
+        foto1             TEXT,
+        foto2             TEXT,
+        personal_instalo  TEXT,
+        created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_lamparas_instaladas_folio
+        ON lamparas_instaladas (folio);
+
+      CREATE INDEX IF NOT EXISTS idx_lamparas_instaladas_fecha
+        ON lamparas_instaladas (fecha);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v14 — Agregar personal_instalo a evidencias
+  // -------------------------------------------------------------------------
+  {
+    version: 14,
+    name: 'add_personal_instalo_to_evidencias',
+    up: `
+      ALTER TABLE evidencias ADD COLUMN personal_instalo TEXT;
+    `
+  },
+
+  // -------------------------------------------------------------------------
   // → PLANTILLA para futuras tablas — copiar y ajustar
   //
   // {

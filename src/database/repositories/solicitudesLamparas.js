@@ -17,6 +17,8 @@ import {
   generateUUID,
 } from '../core.js';
 
+import { findOrCreateLocalidad } from './localidades.js';
+
 const TABLE = 'solicitudes_instalacion_lamparas';
 
 const TIPO_CABECERA = 'Cabecera municipal (Valle de Santiago)';
@@ -48,6 +50,7 @@ function toRecord(data, uuid) {
     fecha_solicitud: (data.fecha_solicitud || data.fechaSolicitud || '').trim(),
     tipo_localidad: normalizeTipoLocalidad(data.tipo_localidad || data.tipoLocalidad),
     colonia_comunidad: (data.colonia_comunidad || data.colonia || '').trim(),
+    telefono: (data.telefono || '').trim(),
     descripcion: (data.descripcion || '').trim(),
     estatus: normalizeEstatus(data.estatus),
     cantidad_lamparas: parseInt(data.cantidad_lamparas || data.cantidadLamparas, 10) || 1,
@@ -66,9 +69,9 @@ export async function saveSolicitudLampara(data) {
       await getSQLite().execute(
         `INSERT OR REPLACE INTO ${TABLE} (
            id, nombre_solicitante, fecha_solicitud, tipo_localidad, colonia_comunidad,
-           descripcion, estatus, cantidad_lamparas, observaciones, created_at, updated_at
+           telefono, descripcion, estatus, cantidad_lamparas, observaciones, created_at, updated_at
          ) VALUES (
-           $1, $2, $3, $4, $5, $6, $7, $8, $9,
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
            COALESCE((SELECT created_at FROM ${TABLE} WHERE id = $1), CURRENT_TIMESTAMP),
            CURRENT_TIMESTAMP
          );`,
@@ -78,6 +81,7 @@ export async function saveSolicitudLampara(data) {
           record.fecha_solicitud,
           record.tipo_localidad,
           record.colonia_comunidad,
+          record.telefono,
           record.descripcion,
           record.estatus,
           record.cantidad_lamparas,
@@ -90,6 +94,17 @@ export async function saveSolicitudLampara(data) {
   }
 
   await idbPut(TABLE, record);
+
+  // Auto-registrar localidad si no existe
+  if (record.colonia_comunidad) {
+    try {
+      const tipoLoc = record.tipo_localidad === 'Comunidad' ? 'Comunidad' : 'Cabecera municipal';
+      await findOrCreateLocalidad(record.colonia_comunidad, tipoLoc);
+    } catch (err) {
+      console.warn('[solicitudes_lamparas] No se pudo auto-registrar localidad:', err);
+    }
+  }
+
   return record;
 }
 

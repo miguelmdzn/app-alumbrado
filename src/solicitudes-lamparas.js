@@ -9,6 +9,7 @@ import {
   getAllSolicitudesLamparas,
   getSolicitudLamparaById,
   searchLocalidades,
+  findOrCreateLocalidad,
 } from './db.js';
 
 import { attachInputNormalizers, normalizeFinal } from './normalizer.js';
@@ -52,7 +53,32 @@ function setupColoniaAutocomplete() {
   async function showSuggestions(query) {
     const results = await searchLocalidades(query);
     list.innerHTML = '';
-    if (!results.length) { hideList(); return; }
+
+    // Opción para agregar nueva si no coincide exactamente
+    const q = query.trim();
+    const exactMatch = results.some((r) => r.nombre.toLowerCase() === q.toLowerCase());
+
+    if (q && !exactMatch) {
+      const liNew = document.createElement('li');
+      liNew.className = 'autocomplete-item autocomplete-item-add';
+      liNew.setAttribute('role', 'option');
+      liNew.innerHTML = `<span class="autocomplete-item-name">➕ Agregar "<strong>${esc(q)}</strong>"</span>`;
+      liNew.addEventListener('mousedown', async (e) => {
+        e.preventDefault();
+        input.value = q;
+        const selTipo = document.getElementById('tipoLocalidad');
+        const tipo = (selTipo?.value === 'Comunidad') ? 'Comunidad' : 'Cabecera municipal';
+        try {
+          await findOrCreateLocalidad(q, tipo);
+        } catch (err) {
+          console.warn('[solicitudes] No se pudo guardar localidad:', err);
+        }
+        hideList();
+      });
+      list.appendChild(liNew);
+    }
+
+    if (!results.length && !q) { hideList(); return; }
 
     results.forEach((loc) => {
       const li = document.createElement('li');
@@ -82,7 +108,12 @@ function setupColoniaAutocomplete() {
 
       list.appendChild(li);
     });
-    list.style.display = 'block';
+
+    if (list.children.length > 0) {
+      list.style.display = 'block';
+    } else {
+      hideList();
+    }
   }
 
   input.addEventListener('input', () => {
@@ -90,6 +121,11 @@ function setupColoniaAutocomplete() {
     const q = input.value.trim();
     if (q.length < 1) { hideList(); return; }
     debounceTimer = setTimeout(() => showSuggestions(q), 200);
+  });
+
+  input.addEventListener('focus', () => {
+    const q = input.value.trim();
+    if (q.length >= 1) showSuggestions(q);
   });
 
   input.addEventListener('blur', () => {
@@ -161,6 +197,8 @@ function fillForm(row) {
   $('fechaSolicitud').value = row.fecha_solicitud || today();
   $('tipoLocalidad').value = row.tipo_localidad || 'Cabecera municipal (Valle de Santiago)';
   $('cantidadLamparas').value = String(row.cantidad_lamparas || 1);
+  if ($('colonia')) $('colonia').value = row.colonia_comunidad || '';
+  if ($('telefono')) $('telefono').value = row.telefono || '';
   $('descripcion').value = row.descripcion || '';
   $('observaciones').value = row.observaciones || '';
 
@@ -261,12 +299,21 @@ $('solicitudForm')?.addEventListener('submit', async (e) => {
     nombre_solicitante: nombre,
     fecha_solicitud: $('fechaSolicitud').value || today(),
     tipo_localidad: $('tipoLocalidad')?.value || 'Cabecera municipal (Valle de Santiago)',
+    colonia_comunidad: normalizeFinal($('colonia')?.value || ''),
+    telefono: normalizeFinal($('telefono')?.value || ''),
     descripcion: normalizeFinal($('descripcion').value),
     estatus,
     cantidad_lamparas: parseInt($('cantidadLamparas').value, 10) || 1,
     observaciones: normalizeFinal($('observaciones').value),
   };
   if (editingId) payload.id = editingId;
+
+  // Auto-registrar localidad si se escribió una nueva
+  const coloniaVal = normalizeFinal($('colonia')?.value || '');
+  if (coloniaVal) {
+    const tipoLoc = ($('tipoLocalidad')?.value === 'Comunidad') ? 'Comunidad' : 'Cabecera municipal';
+    try { await findOrCreateLocalidad(coloniaVal, tipoLoc); } catch (_) { /* silent */ }
+  }
 
   try {
     await saveSolicitudLampara(payload);
@@ -291,6 +338,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('Error al conectar base de datos:', err);
   }
 
+  setupColoniaAutocomplete();
   attachInputNormalizers(document);
   if ($('fechaSolicitud')) $('fechaSolicitud').value = today();
 

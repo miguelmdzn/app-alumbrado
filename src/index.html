@@ -76,6 +76,23 @@
           <span>Personal</span>
         </a>
 
+        <!-- Opción de primer nivel Lámparas LED -->
+        <a href="lamparas-instaladas.html" class="sidebar-menu-item" id="navSidebarLamparas">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <span>Lámparas LED</span>
+        </a>
+
         <!-- Menú desplegable Herramientas -->
         <div class="sidebar-dropdown-group" id="navGroupHerramientas">
           <a href="herramientas.html" class="sidebar-menu-item sidebar-dropdown-toggle" id="btnToggleHerramientas"
@@ -216,6 +233,18 @@
                 <div class="multiselect-dropdown hidden" id="atendioDropdown" role="listbox"></div>
               </div>
               <input type="hidden" id="atendio" value="">
+            </div>
+
+            <div class="field col-2">
+              <span class="field-label">Personal que instaló</span>
+              <div class="multiselect-container" id="instaladorEvidenciaContainer">
+                <div class="multiselect-box" id="instaladorEvidenciaChipsBox">
+                  <input type="text" id="instaladorEvidenciaSearchInput" class="multiselect-input" placeholder="Buscar instalador..."
+                    autocomplete="off">
+                </div>
+                <div class="multiselect-dropdown hidden" id="instaladorEvidenciaDropdown" role="listbox"></div>
+              </div>
+              <input type="hidden" id="personalInstalo" value="">
             </div>
 
             <label class="field col-1">

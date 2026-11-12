@@ -62,6 +62,7 @@ const IDB_STORES = [
   { name: 'dias_inhabiles',     keyPath: 'id' },
   { name: 'localidades',        keyPath: 'id' },
   { name: 'solicitudes_instalacion_lamparas', keyPath: 'id' },
+  { name: 'lamparas_instaladas',             keyPath: 'id' },
   // → Agregar aquí nuevas tablas según se expanda el sistema
 ];
 
