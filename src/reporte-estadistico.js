@@ -46,6 +46,58 @@ function getDaysDiff(d1, d2) {
   return Math.max(1, Math.round(Math.abs(t2 - t1) / (1000 * 60 * 60 * 24)) + 1);
 }
 
+function fechaDia(value) {
+  const match = String(value || '').trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : '';
+}
+
+function foldKey(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function lampCount(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return 1;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n >= 0 ? n : 1;
+}
+
+function splitPersonas(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+/** Porcentajes enteros que suman 100 cuando el desglose está completo. */
+function porcentajesCerrados(items, total, countKey) {
+  if (!items.length || total <= 0) {
+    return items.map((item) => ({ ...item, pct: 0 }));
+  }
+  const withFloor = items.map((item) => {
+    const exact = (item[countKey] / total) * 100;
+    return { ...item, pct: Math.floor(exact), _frac: exact - Math.floor(exact) };
+  });
+  let restante = 100 - withFloor.reduce((sum, item) => sum + item.pct, 0);
+  const orden = withFloor
+    .map((item, index) => ({ index, frac: item._frac }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let i = 0; i < orden.length && restante > 0; i += 1) {
+    withFloor[orden[i].index].pct += 1;
+    restante -= 1;
+  }
+  return withFloor.map(({ _frac, ...item }) => item);
+}
+
+function localToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
 function getMonthName(dateObj) {
   const meses = [
     'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
@@ -60,8 +112,24 @@ export function buildReporteEstadisticoHTML(
   personalList = [],
   fechaIni,
   fechaFin,
-  getFullNameFunc = null
+  getFullNameFunc = null,
+  solicitudes = []
 ) {
+  let inicio = fechaDia(fechaIni);
+  let fin = fechaDia(fechaFin);
+  if (inicio && fin && inicio > fin) {
+    const swap = inicio;
+    inicio = fin;
+    fin = swap;
+  }
+  fechaIni = inicio;
+  fechaFin = fin;
+
+  reportes = (Array.isArray(reportes) ? reportes : []).filter((r) => {
+    const fecha = fechaDia(r.fecha);
+    return fecha && (!fechaIni || fecha >= fechaIni) && (!fechaFin || fecha <= fechaFin);
+  });
+
   const total = reportes.length;
   const atendidosList = reportes.filter((r) => isAtendido(r.estatus));
   const pendientesList = reportes.filter((r) => !isAtendido(r.estatus));
@@ -69,7 +137,7 @@ export function buildReporteEstadisticoHTML(
   const pendientesCount = pendientesList.length;
 
   const totalLamparas = reportes.reduce(
-    (acc, r) => acc + (parseInt(r.numero_lamparas, 10) || 1),
+    (acc, r) => acc + lampCount(r.numero_lamparas),
     0
   );
 
@@ -87,43 +155,62 @@ export function buildReporteEstadisticoHTML(
   // =========================================================================
   const evidenciasByFolio = new Map();
   (evidencias || []).forEach((ev) => {
-    if (ev.folio) {
-      evidenciasByFolio.set(String(ev.folio).trim().toLowerCase(), ev);
-    }
+    const folio = String(ev.folio || '').trim().toLowerCase();
+    if (!folio) return;
+    if (!evidenciasByFolio.has(folio)) evidenciasByFolio.set(folio, []);
+    evidenciasByFolio.get(folio).push(ev);
   });
 
   const personalCatalogMap = new Map();
+  const personalByFold = new Map();
   (personalList || []).forEach((p) => {
+    const full = (typeof getFullNameFunc === 'function' ? getFullNameFunc(p) : '')
+      || `${p.nombres || ''} ${p.apellido1 || ''} ${p.apellido2 || ''}`.replace(/\s+/g, ' ').trim();
     if (p.id) personalCatalogMap.set(String(p.id).trim(), p);
     if (p.numero_trabajador) personalCatalogMap.set(String(p.numero_trabajador).trim(), p);
     if (p.numero_checador_digital) personalCatalogMap.set(String(p.numero_checador_digital).trim(), p);
+    if (full && !personalByFold.has(foldKey(full))) personalByFold.set(foldKey(full), full);
   });
 
-  function resolveWorkerName(raw) {
-    if (!raw) return '';
-    const clean = String(raw).trim();
-    const p = personalCatalogMap.get(clean);
-    if (p) {
-      if (typeof getFullNameFunc === 'function') {
-        const full = getFullNameFunc(p);
-        if (full) return full;
-      }
-      const full = `${p.nombres || ''} ${p.apellido1 || ''} ${p.apellido2 || ''}`.trim();
-      if (full) return full;
+  function nombreCatalogo(persona) {
+    if (!persona) return '';
+    if (typeof getFullNameFunc === 'function') {
+      const full = getFullNameFunc(persona);
+      if (full) return full.replace(/\s+/g, ' ').trim();
     }
-    return clean;
+    return `${persona.nombres || ''} ${persona.apellido1 || ''} ${persona.apellido2 || ''}`
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function resolveWorker(raw) {
+    const clean = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (!clean) return null;
+    const persona = personalCatalogMap.get(clean);
+    if (persona) {
+      const oficial = nombreCatalogo(persona);
+      if (oficial) return { nombre: oficial, oficial: true };
+    }
+    const porNombre = personalByFold.get(foldKey(clean));
+    if (porNombre) return { nombre: porNombre, oficial: true };
+    return { nombre: clean, oficial: false };
   }
 
   // =========================================================================
   // Estimación de tiempo promedio de atención (días) usando Evidencias
   // =========================================================================
-  let tiempoPromedioAtencion = '1.6';
+  let tiempoPromedioAtencion = '0.0';
   if (atendidosCount > 0) {
     const diffs = atendidosList.map((r) => {
-      const fr = parseDateIso(r.fecha);
+      const fr = parseDateIso(fechaDia(r.fecha));
       // Buscar si tiene fecha de atención en la evidencia correspondiente
-      const ev = r.folio ? evidenciasByFolio.get(String(r.folio).trim().toLowerCase()) : null;
-      let fa = ev?.fecha ? parseDateIso(ev.fecha) : null;
+      const folioKey = r.folio ? String(r.folio).trim().toLowerCase() : '';
+      const evidenciasFolio = folioKey ? (evidenciasByFolio.get(folioKey) || []) : [];
+      const fechasEv = evidenciasFolio
+        .map((ev) => parseDateIso(fechaDia(ev.fecha)))
+        .filter(Boolean)
+        .sort((a, b) => a - b);
+      let fa = fechasEv.find((fecha) => !fr || fecha >= fr) || fechasEv[0] || null;
       if (!fa) {
         fa = parseDateIso(r.updated_at?.slice(0, 10)) || dFin;
       }
@@ -136,9 +223,8 @@ export function buildReporteEstadisticoHTML(
     tiempoPromedioAtencion = avg.toFixed(1);
   }
 
-  const hoy = new Date();
-  hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
-  const hoyIso = hoy.toISOString().slice(0, 10);
+  const hoy = localToday();
+  const hoyIso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
   const hoyFmt = fd(hoyIso);
   const periodoFmt = `${fd(fechaIni)} — ${fd(fechaFin)}`;
   const mesAnoTitulo = `${getMonthName(dIni)} ${dIni.getFullYear()}`;
@@ -148,68 +234,57 @@ export function buildReporteEstadisticoHTML(
   // =========================================================================
   const locMap = new Map();
   reportes.forEach((r) => {
-    let locName = (r.colonia_comunidad || r.tipo_localidad || 'Cabecera municipal').trim();
-    if (!locName) locName = 'Cabecera municipal';
+    const locName = String(r.colonia_comunidad || '').replace(/\s+/g, ' ').trim() || 'Sin localidad';
+    const tipoRaw = String(r.tipo_localidad || '').trim().toLowerCase();
+    const tipo = !r.colonia_comunidad
+      ? 'Sin clasificar'
+      : (tipoRaw.startsWith('comunidad') ? 'Comunidad' : 'Cabecera municipal');
+    const locKey = `${foldKey(locName)}|${tipo}`;
 
-    let colName = (r.direccion || '').split(',')[0].trim() || 'Centro';
-    if (!colName || colName.length < 3) colName = 'Centro';
-
-    if (!locMap.has(locName)) {
-      locMap.set(locName, {
+    if (!locMap.has(locKey)) {
+      locMap.set(locKey, {
         nombre: locName,
+        tipo,
         total: 0,
         lamparas: 0,
         atendidos: 0,
         pendientes: 0,
-        colonias: new Map(),
       });
     }
 
-    const loc = locMap.get(locName);
-    const lamps = parseInt(r.numero_lamparas, 10) || 1;
+    const loc = locMap.get(locKey);
+    const lamps = lampCount(r.numero_lamparas);
     const isAt = isAtendido(r.estatus);
 
     loc.total += 1;
     loc.lamparas += lamps;
     if (isAt) loc.atendidos += 1;
     else loc.pendientes += 1;
-
-    if (!loc.colonias.has(colName)) {
-      loc.colonias.set(colName, {
-        nombre: colName,
-        total: 0,
-        lamparas: 0,
-        atendidos: 0,
-        pendientes: 0,
-      });
-    }
-    const c = loc.colonias.get(colName);
-    c.total += 1;
-    c.lamparas += lamps;
-    if (isAt) c.atendidos += 1;
-    else c.pendientes += 1;
   });
 
-  const localidadesSorted = Array.from(locMap.values()).sort((a, b) => b.total - a.total);
-  const topLocalidades = localidadesSorted.slice(0, 8);
+  const localidadesSorted = Array.from(locMap.values()).sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total;
+    return a.nombre.localeCompare(b.nombre, 'es');
+  });
+  const topLocalidades = localidadesSorted;
   const maxLocReportes = Math.max(...topLocalidades.map((l) => l.total), 1);
+  const sumaLocalidades = localidadesSorted.reduce((sum, loc) => sum + loc.total, 0);
 
   // =========================================================================
   // 2. Agrupación por Tipo de Falla
   // =========================================================================
   const fallasMap = new Map();
   reportes.forEach((r) => {
-    const f = (r.tipo_falla || 'Otros').trim();
-    fallasMap.set(f, (fallasMap.get(f) || 0) + 1);
+    const f = String(r.tipo_falla || '').replace(/\s+/g, ' ').trim() || 'Sin especificar';
+    const key = foldKey(f);
+    if (!fallasMap.has(key)) fallasMap.set(key, { nombre: f, conteo: 0 });
+    fallasMap.get(key).conteo += 1;
   });
-  const fallasSorted = Array.from(fallasMap.entries())
-    .map(([nombre, conteo]) => ({
-      nombre,
-      conteo,
-      pct: total > 0 ? Math.round((conteo / total) * 100) : 0,
-    }))
-    .sort((a, b) => b.conteo - a.conteo)
-    .slice(0, 5);
+  const fallasSorted = porcentajesCerrados(
+    Array.from(fallasMap.values()).sort((a, b) => b.conteo - a.conteo || a.nombre.localeCompare(b.nombre, 'es')),
+    total,
+    'conteo'
+  );
   const maxFallaConteo = Math.max(...fallasSorted.map((f) => f.conteo), 1);
 
   // =========================================================================
@@ -217,17 +292,17 @@ export function buildReporteEstadisticoHTML(
   // =========================================================================
   const lamparasMap = new Map();
   reportes.forEach((r) => {
-    const t = (r.tipo_lampara || 'Blanca').trim();
-    const cant = parseInt(r.numero_lamparas, 10) || 1;
-    lamparasMap.set(t, (lamparasMap.get(t) || 0) + cant);
+    const t = String(r.tipo_lampara || '').replace(/\s+/g, ' ').trim() || 'Sin especificar';
+    const key = foldKey(t);
+    const cant = lampCount(r.numero_lamparas);
+    if (!lamparasMap.has(key)) lamparasMap.set(key, { nombre: t, conteo: 0 });
+    lamparasMap.get(key).conteo += cant;
   });
-  const lamparasSorted = Array.from(lamparasMap.entries())
-    .map(([nombre, conteo]) => ({
-      nombre,
-      conteo,
-      pct: totalLamparas > 0 ? Math.round((conteo / totalLamparas) * 100) : 0,
-    }))
-    .sort((a, b) => b.conteo - a.conteo);
+  const lamparasSorted = porcentajesCerrados(
+    Array.from(lamparasMap.values()).sort((a, b) => b.conteo - a.conteo || a.nombre.localeCompare(b.nombre, 'es')),
+    totalLamparas,
+    'conteo'
+  );
   const maxLamparaConteo = Math.max(...lamparasSorted.map((l) => l.conteo), 1);
 
   // =========================================================================
@@ -248,15 +323,17 @@ export function buildReporteEstadisticoHTML(
       count: 0,
     });
     cur.setDate(cur.getDate() + 1);
-    if (diasBuckets.length > 31) break;
+    if (diasBuckets.length > 400) break;
   }
 
   reportes.forEach((r) => {
-    if (r.fecha) {
-      const match = diasBuckets.find((b) => b.iso === r.fecha);
+    const fecha = fechaDia(r.fecha);
+    if (fecha) {
+      const match = diasBuckets.find((b) => b.iso === fecha);
       if (match) match.count += 1;
     }
   });
+  const reportesEnGraficaDia = diasBuckets.reduce((sum, b) => sum + b.count, 0);
 
   const maxDiaCount = Math.max(...diasBuckets.map((b) => b.count), 1);
   const diasPico = diasBuckets.filter((b) => b.count === maxDiaCount && b.count > 0);
@@ -276,12 +353,12 @@ export function buildReporteEstadisticoHTML(
   // =========================================================================
   const pendientesPrioritarios = [...pendientesList]
     .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))
-    .slice(0, 5)
+    .slice(0, 8)
     .map((r) => {
       let antiguedadLabel = 'hoy';
       let antiguedadClase = 'badge-antiguedad-hoy';
       if (r.fecha) {
-        const rf = parseDateIso(r.fecha);
+        const rf = parseDateIso(fechaDia(r.fecha));
         if (rf) {
           const diff = Math.max(0, Math.floor((hoy - rf) / (1000 * 60 * 60 * 24)));
           if (diff > 0) {
@@ -294,7 +371,7 @@ export function buildReporteEstadisticoHTML(
       }
       return {
         folio: r.folio || 'S/F',
-        localidad: r.colonia_comunidad || 'Cabecera',
+        localidad: r.colonia_comunidad || 'Sin localidad',
         falla: r.tipo_falla || r.tipo_lampara || 'Sin especificar',
         antiguedadLabel,
         antiguedadClase,
@@ -305,64 +382,155 @@ export function buildReporteEstadisticoHTML(
   // 7. Personal que Atendió (Página 2) — OBTENIDO DE LA TABLA DE EVIDENCIAS
   // =========================================================================
   const personalServiciosMap = new Map();
-  const foliosContabilizados = new Set();
+  let reportesSinPersonal = 0;
 
-  // Función auxiliar para sumar servicios por nombre de trabajador
-  function addServicioPersona(nombre) {
-    if (!nombre) return;
-    const n = nombre.trim();
-    if (n) {
-      personalServiciosMap.set(n, (personalServiciosMap.get(n) || 0) + 1);
+  function addServicioPersona(raw, folioKey) {
+    const resolved = resolveWorker(raw);
+    if (!resolved) return false;
+    const key = foldKey(resolved.nombre);
+    if (!key) return false;
+    let entry = personalServiciosMap.get(key);
+    if (!entry) {
+      entry = { nombre: resolved.nombre, oficial: resolved.oficial, servicios: 0, folios: new Set() };
+      personalServiciosMap.set(key, entry);
+    } else if (resolved.oficial && !entry.oficial) {
+      entry.nombre = resolved.nombre;
+      entry.oficial = true;
     }
+    if (folioKey) {
+      if (entry.folios.has(folioKey)) return true;
+      entry.folios.add(folioKey);
+    }
+    entry.servicios += 1;
+    return true;
   }
 
-  // A) Primero, para cada reporte atendido en el periodo, buscar el personal de su evidencia
+  // Cada reporte atendido del periodo suma un servicio a cada persona que participó.
+  // Se unen el personal del reporte y el de todas sus evidencias, sin contar dos veces
+  // a la misma persona en el mismo folio.
   atendidosList.forEach((r) => {
-    const fKey = String(r.folio || '').trim().toLowerCase();
-    const ev = fKey ? evidenciasByFolio.get(fKey) : null;
-    if (ev && ev.atendio) {
-      foliosContabilizados.add(fKey);
-      const tokens = String(ev.atendio).split(',').map((t) => t.trim()).filter(Boolean);
-      tokens.forEach((tok) => {
-        const resolvedName = resolveWorkerName(tok);
-        addServicioPersona(resolvedName);
+    const folioKey = String(r.folio || r.id || '').trim().toLowerCase();
+    const tokens = new Set(splitPersonas(r.atendio));
+    const evidenciasFolio = evidenciasByFolio.get(String(r.folio || '').trim().toLowerCase()) || [];
+    evidenciasFolio.forEach((ev) => {
+      splitPersonas(ev.atendio).forEach((token) => tokens.add(token));
+      splitPersonas(ev.personalInstalo || ev.personal_instalo).forEach((token) => tokens.add(token));
+    });
+
+    let alguien = false;
+    tokens.forEach((token) => {
+      if (addServicioPersona(token, folioKey)) alguien = true;
+    });
+    if (!alguien) reportesSinPersonal += 1;
+  });
+
+  const personalSorted = Array.from(personalServiciosMap.values())
+    .filter((p) => p.servicios > 0)
+    .sort((a, b) => b.servicios - a.servicios || a.nombre.localeCompare(b.nombre, 'es'));
+  const maxServiciosPersonal = Math.max(...personalSorted.map((p) => p.servicios), 1);
+  const totalServiciosPersonal = personalSorted.reduce((sum, p) => sum + p.servicios, 0);
+
+  // =========================================================================
+  // 8. Solicitudes de instalación de lámparas (página propia)
+  // =========================================================================
+  const solicitudesPeriodo = (Array.isArray(solicitudes) ? solicitudes : []).filter((s) => {
+    const fecha = fechaDia(s.fecha_solicitud || s.fechaSolicitud);
+    return fecha && (!fechaIni || fecha >= fechaIni) && (!fechaFin || fecha <= fechaFin);
+  });
+
+  const solicitudesAtendidas = solicitudesPeriodo.filter((s) => isAtendido(s.estatus));
+  const solicitudesNoAtendidas = solicitudesPeriodo.filter((s) => !isAtendido(s.estatus));
+  const totalSolicitudes = solicitudesPeriodo.length;
+  const lamparasSolicitadas = solicitudesPeriodo.reduce(
+    (sum, s) => sum + lampCount(s.cantidad_lamparas ?? s.cantidadLamparas),
+    0
+  );
+  const lamparasInstaladasSol = solicitudesAtendidas.reduce(
+    (sum, s) => sum + lampCount(s.cantidad_lamparas ?? s.cantidadLamparas),
+    0
+  );
+  const efectividadSol = totalSolicitudes > 0
+    ? Math.round((solicitudesAtendidas.length / totalSolicitudes) * 100)
+    : 0;
+
+  const estatusSolMap = new Map();
+  solicitudesPeriodo.forEach((s) => {
+    const nombre = isAtendido(s.estatus)
+      ? 'Atendido'
+      : (String(s.estatus || '').replace(/\s+/g, ' ').trim() || 'En espera');
+    const key = foldKey(nombre);
+    if (!estatusSolMap.has(key)) estatusSolMap.set(key, { nombre, conteo: 0 });
+    estatusSolMap.get(key).conteo += 1;
+  });
+  const estatusSolSorted = porcentajesCerrados(
+    Array.from(estatusSolMap.values()).sort((a, b) => b.conteo - a.conteo || a.nombre.localeCompare(b.nombre, 'es')),
+    totalSolicitudes,
+    'conteo'
+  );
+  const maxEstatusSol = Math.max(...estatusSolSorted.map((e) => e.conteo), 1);
+
+  const tipoSolMap = new Map();
+  solicitudesPeriodo.forEach((s) => {
+    const tipoRaw = String(s.tipo_localidad || '').trim().toLowerCase();
+    const nombre = tipoRaw.startsWith('comunidad') ? 'Comunidad' : 'Cabecera municipal';
+    if (!tipoSolMap.has(nombre)) {
+      tipoSolMap.set(nombre, { nombre, solicitudes: 0, lamparas: 0, atendidas: 0 });
+    }
+    const row = tipoSolMap.get(nombre);
+    row.solicitudes += 1;
+    row.lamparas += lampCount(s.cantidad_lamparas ?? s.cantidadLamparas);
+    if (isAtendido(s.estatus)) row.atendidas += 1;
+  });
+  const tipoSolSorted = Array.from(tipoSolMap.values()).sort((a, b) => b.solicitudes - a.solicitudes);
+
+  const locSolMap = new Map();
+  solicitudesPeriodo.forEach((s) => {
+    const locName = String(s.colonia_comunidad || '').replace(/\s+/g, ' ').trim() || 'Sin localidad';
+    const key = foldKey(locName);
+    if (!locSolMap.has(key)) {
+      locSolMap.set(key, {
+        nombre: locName,
+        total: 0,
+        lamparas: 0,
+        atendidas: 0,
+        pendientes: 0,
       });
     }
+    const row = locSolMap.get(key);
+    const lamps = lampCount(s.cantidad_lamparas ?? s.cantidadLamparas);
+    row.total += 1;
+    row.lamparas += lamps;
+    if (isAtendido(s.estatus)) row.atendidas += 1;
+    else row.pendientes += 1;
   });
+  const locSolSorted = Array.from(locSolMap.values()).sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre, 'es'));
+  const maxLocSol = Math.max(...locSolSorted.map((l) => l.total), 1);
 
-  // B) Además, incluir todas las evidencias registradas en el periodo seleccionado
-  (evidencias || []).forEach((ev) => {
-    const evFecha = ev.fecha || '';
-    if (evFecha >= fechaIni && evFecha <= fechaFin) {
-      const fKey = String(ev.folio || '').trim().toLowerCase();
-      // Si no fue ya contabilizado mediante el reporte atendido
-      if (!foliosContabilizados.has(fKey) && ev.atendio) {
-        foliosContabilizados.add(fKey);
-        const tokens = String(ev.atendio).split(',').map((t) => t.trim()).filter(Boolean);
-        tokens.forEach((tok) => {
-          const resolvedName = resolveWorkerName(tok);
-          addServicioPersona(resolvedName);
-        });
+  const solicitudesPrioritarias = [...solicitudesNoAtendidas]
+    .sort((a, b) => fechaDia(a.fecha_solicitud).localeCompare(fechaDia(b.fecha_solicitud)))
+    .slice(0, 8)
+    .map((s) => {
+      let antiguedadLabel = 'hoy';
+      let antiguedadClase = 'badge-antiguedad-hoy';
+      const rf = parseDateIso(fechaDia(s.fecha_solicitud || s.fechaSolicitud));
+      if (rf) {
+        const diff = Math.max(0, Math.floor((hoy - rf) / (1000 * 60 * 60 * 24)));
+        if (diff > 0) {
+          antiguedadLabel = `${diff} días`;
+          if (diff >= 10) antiguedadClase = 'badge-antiguedad-alerta';
+          else if (diff >= 5) antiguedadClase = 'badge-antiguedad-media';
+          else antiguedadClase = 'badge-antiguedad-baja';
+        }
       }
-    }
-  });
-
-  // Fallback: si ninguna evidencia tenía personal pero r.atendio existe
-  if (personalServiciosMap.size === 0) {
-    atendidosList.forEach((r) => {
-      const raw = (r.atendio || '').trim();
-      if (raw) {
-        const tokens = raw.split(',').map((t) => t.trim()).filter(Boolean);
-        tokens.forEach((tok) => addServicioPersona(resolveWorkerName(tok)));
-      }
+      return {
+        solicitante: s.nombre_solicitante || 'Sin nombre',
+        localidad: s.colonia_comunidad || 'Sin localidad',
+        lamparas: lampCount(s.cantidad_lamparas ?? s.cantidadLamparas),
+        estatus: s.estatus || 'En espera',
+        antiguedadLabel,
+        antiguedadClase,
+      };
     });
-  }
-
-  const personalSorted = Array.from(personalServiciosMap.entries())
-    .map(([nombre, servicios]) => ({ nombre, servicios }))
-    .sort((a, b) => b.servicios - a.servicios)
-    .slice(0, 6);
-  const maxServiciosPersonal = Math.max(...personalSorted.map((p) => p.servicios), 1);
 
   // =========================================================================
   // HTML RENDER
@@ -400,7 +568,7 @@ export function buildReporteEstadisticoHTML(
       position: relative;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow: visible;
       page-break-after: always;
       break-after: page;
     }
@@ -554,7 +722,7 @@ export function buildReporteEstadisticoHTML(
 
     .loc-header-row {
       display: grid;
-      grid-template-columns: 180px 1fr 70px;
+      grid-template-columns: minmax(150px, 230px) 1fr 70px;
       font-size: 9px;
       font-weight: 800;
       color: #64748B;
@@ -564,7 +732,7 @@ export function buildReporteEstadisticoHTML(
 
     .loc-row {
       display: grid;
-      grid-template-columns: 180px 1fr 70px;
+      grid-template-columns: minmax(150px, 230px) 1fr 70px;
       align-items: center;
       gap: 10px;
       padding: 3px 0;
@@ -574,9 +742,14 @@ export function buildReporteEstadisticoHTML(
       font-size: 10px;
       font-weight: 600;
       color: #1E293B;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.25;
+    }
+
+    .loc-tipo {
+      display: block;
+      font-size: 8px;
+      font-weight: 600;
+      color: #64748B;
     }
 
     .loc-bar-container {
@@ -954,21 +1127,26 @@ export function buildReporteEstadisticoHTML(
       color: #475569;
     }
 
+    .personal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 22px;
+    }
+
     .personal-row {
       display: grid;
-      grid-template-columns: 150px 1fr 24px;
+      grid-template-columns: minmax(120px, 1.3fr) 1fr 28px;
       align-items: center;
       gap: 8px;
       padding: 4px 0;
+      break-inside: avoid;
     }
 
     .personal-name {
       font-size: 9px;
       font-weight: 600;
       color: #1E293B;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.25;
     }
 
     .personal-bar-track {
@@ -1140,14 +1318,14 @@ export function buildReporteEstadisticoHTML(
             <span style="text-align: right;">LÁMPARAS</span>
           </div>
 
-          ${topLocalidades.map((loc) => {
+          ${topLocalidades.length === 0 ? `<div style="color:#94A3B8;font-size:9px;padding:8px 0;">No hay reportes en este periodo</div>` : topLocalidades.map((loc) => {
             const pctAt = loc.total > 0 ? (loc.atendidos / loc.total) * 100 : 0;
             const pctPend = loc.total > 0 ? (loc.pendientes / loc.total) * 100 : 0;
             const barWidth = Math.max(8, Math.round((loc.total / maxLocReportes) * 100));
 
             return `
               <div class="loc-row">
-                <span class="loc-name" title="${esc(loc.nombre)}">${esc(loc.nombre)}</span>
+                <span class="loc-name" title="${esc(loc.nombre)}">${esc(loc.nombre)}<span class="loc-tipo">${esc(loc.tipo)}</span></span>
                 <div class="loc-bar-container">
                   <div class="loc-bar-track" style="width: ${barWidth}%;">
                     <div class="loc-bar-atendidos" style="width: ${pctAt}%;" title="Atendidos: ${loc.atendidos}"></div>
@@ -1244,7 +1422,7 @@ export function buildReporteEstadisticoHTML(
         <div class="days-bars-wrapper">
           <!-- Línea discontinua de promedio -->
           ${promedioPorDia > 0 ? `
-            <div class="days-avg-line" style="bottom: ${Math.min(90, Math.max(10, Math.round((promedioPorDia / maxDiaCount) * 75)))}px;"></div>
+            <div class="days-avg-line" style="bottom: ${Math.min(68, Math.max(4, Math.round((Number(promedioPorDia) / maxDiaCount) * 65)))}px;"></div>
           ` : ''}
 
           ${diasBuckets.map((b) => {
@@ -1285,7 +1463,7 @@ export function buildReporteEstadisticoHTML(
             ` : ''}
           </div>
           <div style="font-weight: 700; color: #475569;">
-            ---- Promedio ${promedioPorDia}/día
+            ---- Promedio ${promedioPorDia}/día${reportesEnGraficaDia === total ? '' : ` · ${reportesEnGraficaDia} de ${total} reportes en la gráfica`}
           </div>
         </div>
       </div>
@@ -1300,7 +1478,7 @@ export function buildReporteEstadisticoHTML(
 
     <footer class="sheet-footer">
       <span>Alumbrado Público · Resumen de periodo (${diasPeriodo} días)</span>
-      <span>Página 1 de 2</span>
+      <span>Página 1 de 3</span>
     </footer>
   </article>
 
@@ -1327,13 +1505,13 @@ export function buildReporteEstadisticoHTML(
       <div>
         <div class="section-header">
           <div class="section-accent-bar"></div>
-          <h2 class="section-title">DETALLE POR LOCALIDAD Y COLONIA</h2>
+          <h2 class="section-title">DETALLE POR LOCALIDAD</h2>
         </div>
 
         <table class="table-sheet2">
           <thead>
             <tr>
-              <th>LOCALIDAD / COLONIA</th>
+              <th>LOCALIDAD</th>
               <th>REPORTES</th>
               <th>LÁMPARAS</th>
               <th>ATENDIDOS</th>
@@ -1342,31 +1520,11 @@ export function buildReporteEstadisticoHTML(
             </tr>
           </thead>
           <tbody>
-            ${localidadesSorted.slice(0, 7).map((loc) => {
+            ${localidadesSorted.map((loc) => {
               const locPct = loc.total > 0 ? Math.round((loc.atendidos / loc.total) * 100) : 0;
-              const colRows = Array.from(loc.colonias.values())
-                .sort((a, b) => b.total - a.total)
-                .slice(0, 3)
-                .map((c) => {
-                  const cPct = c.total > 0 ? Math.round((c.atendidos / c.total) * 100) : 0;
-                  return `
-                    <tr class="tr-colonia-sub">
-                      <td>${esc(c.nombre)}</td>
-                      <td>${c.total}</td>
-                      <td>${c.lamparas}</td>
-                      <td>${c.atendidos}</td>
-                      <td>${c.pendientes}</td>
-                      <td>
-                        <span class="table-progress-bar"><span class="table-progress-fill" style="width: ${cPct}%;"></span></span>
-                        ${cPct}%
-                      </td>
-                    </tr>
-                  `;
-                }).join('');
-
               return `
                 <tr class="tr-loc-main">
-                  <td>${esc(loc.nombre)}</td>
+                  <td>${esc(loc.nombre)} <span style="font-weight: 600; color: #64748B;">· ${esc(loc.tipo)}</span></td>
                   <td>${loc.total}</td>
                   <td>${loc.lamparas}</td>
                   <td>${loc.atendidos}</td>
@@ -1376,7 +1534,6 @@ export function buildReporteEstadisticoHTML(
                     ${locPct}%
                   </td>
                 </tr>
-                ${colRows}
               `;
             }).join('')}
 
@@ -1432,47 +1589,268 @@ export function buildReporteEstadisticoHTML(
               `}
             </tbody>
           </table>
+          ${pendientesCount > pendientesPrioritarios.length ? `
+            <div class="lamp-summary-note">Los ${pendientesCount} pendientes están en los indicadores. Aquí se listan los ${pendientesPrioritarios.length} más antiguos.</div>
+          ` : ''}
+        </div>
+      </div>
+
+      <div class="col-card">
+        <div class="section-header">
+          <div class="section-accent-bar"></div>
+          <h2 class="section-title">PERSONAL QUE ATENDIÓ · ${personalSorted.length} CON AL MENOS 1 SERVICIO</h2>
         </div>
 
-        <!-- Personal que Atendió (desde la tabla de evidencias) -->
-        <div class="col-card">
-          <div class="section-header">
-            <div class="section-accent-bar"></div>
-            <h2 class="section-title">PERSONAL QUE ATENDIÓ</h2>
-          </div>
-
-          <div style="margin-top: 4px;">
-            <div style="display: grid; grid-template-columns: 150px 1fr 24px; font-size: 8px; font-weight: 800; color: #64748B; margin-bottom: 6px;">
-              <span>NOMBRE</span>
-              <span>SERVICIOS</span>
-              <span></span>
-            </div>
-
-            ${personalSorted.length > 0 ? personalSorted.map((p) => {
-              const w = Math.max(6, Math.round((p.servicios / maxServiciosPersonal) * 100));
-              return `
-                <div class="personal-row">
-                  <span class="personal-name" title="${esc(p.nombre)}">${esc(p.nombre)}</span>
-                  <div class="personal-bar-track">
-                    <div class="personal-bar-fill" style="width: ${w}%;"></div>
+        <div style="margin-top: 4px;">
+          ${personalSorted.length > 0 ? `
+            <div class="personal-grid">
+              ${personalSorted.map((p) => {
+                const w = Math.max(6, Math.round((p.servicios / maxServiciosPersonal) * 100));
+                return `
+                  <div class="personal-row">
+                    <span class="personal-name" title="${esc(p.nombre)}">${esc(p.nombre)}</span>
+                    <div class="personal-bar-track">
+                      <div class="personal-bar-fill" style="width: ${w}%;"></div>
+                    </div>
+                    <span class="personal-count">${p.servicios}</span>
                   </div>
-                  <span class="personal-count">${p.servicios}</span>
-                </div>
-              `;
-            }).join('') : `
-              <div style="text-align: center; color: #94A3B8; padding: 12px; font-size: 9px;">
-                No hay servicios asignados a personal en este periodo
-              </div>
-            `}
-          </div>
+                `;
+              }).join('')}
+            </div>
+            <div class="lamp-summary-note">
+              ${personalSorted.length} trabajadores · ${totalServiciosPersonal} participaciones en ${atendidosCount} reportes atendidos.
+              La suma puede ser mayor que los reportes cuando un servicio lo hizo más de una persona.
+              ${reportesSinPersonal > 0 ? `${reportesSinPersonal} reportes atendidos no tienen personal registrado.` : ''}
+            </div>
+          ` : `
+            <div style="text-align: center; color: #94A3B8; padding: 12px; font-size: 9px;">
+              No hay personal registrado en los reportes atendidos de este periodo
+            </div>
+          `}
         </div>
       </div>
 
     </div>
 
     <footer class="sheet-footer">
-      <span>Alumbrado Público · Resumen de periodo (${diasPeriodo} días)</span>
-      <span>Página 2 de 2</span>
+      <span>Alumbrado Público · ${localidadesSorted.length} localidades · ${sumaLocalidades} reportes</span>
+      <span>Página 2 de 3</span>
+    </footer>
+  </article>
+
+  <!-- ===================================================================== -->
+  <!-- PÁGINA 3: SOLICITUDES DE INSTALACIÓN DE LÁMPARAS                     -->
+  <!-- ===================================================================== -->
+  <article class="report-sheet">
+    <header class="sheet-header">
+      <div>
+        <h1 class="header-main-title">REPORTE ESTADÍSTICO</h1>
+        <div class="header-sub-title">ALUMBRADO PÚBLICO · Solicitudes de instalación de lámparas</div>
+      </div>
+      <div class="header-right">
+        <div class="header-periodo-tag">PERIODO</div>
+        <div class="header-periodo-range">${periodoFmt}</div>
+        <div class="header-emitido">Emitido: ${hoyFmt}</div>
+      </div>
+    </header>
+
+    <div class="sheet-content">
+      <div>
+        <div class="section-header">
+          <div class="section-accent-bar"></div>
+          <h2 class="section-title">INSTALACIÓN DE LÁMPARAS · INDICADORES</h2>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi-box">
+            <span class="kpi-num">${totalSolicitudes}</span>
+            <span class="kpi-tag">SOLICITUDES</span>
+            <span class="kpi-note">en el periodo</span>
+          </div>
+          <div class="kpi-box">
+            <span class="kpi-num">${lamparasSolicitadas}</span>
+            <span class="kpi-tag">LÁMPARAS</span>
+            <span class="kpi-note">solicitadas</span>
+          </div>
+          <div class="kpi-box kpi-box-green">
+            <span class="kpi-num kpi-num-green">${solicitudesAtendidas.length}</span>
+            <span class="kpi-tag">ATENDIDAS</span>
+            <span class="kpi-note">${efectividadSol}% de atención</span>
+          </div>
+          <div class="kpi-box kpi-box-orange">
+            <span class="kpi-num kpi-num-orange">${solicitudesNoAtendidas.length}</span>
+            <span class="kpi-tag">SIN ATENDER</span>
+            <span class="kpi-note">${totalSolicitudes > 0 ? Math.round((solicitudesNoAtendidas.length / totalSolicitudes) * 100) : 0}% del total</span>
+          </div>
+          <div class="kpi-box">
+            <span class="kpi-num">${lamparasInstaladasSol}</span>
+            <span class="kpi-tag">INSTALADAS</span>
+            <span class="kpi-note">en solicitudes atendidas</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-cols-row">
+        <div class="col-card">
+          <div class="section-header">
+            <div class="section-accent-bar"></div>
+            <h2 class="section-title">POR ESTATUS</h2>
+          </div>
+          ${estatusSolSorted.length > 0 ? estatusSolSorted.map((e) => {
+            const fillW = Math.max(6, Math.round((e.conteo / maxEstatusSol) * 100));
+            return `
+              <div class="horizontal-stat-row">
+                <span class="stat-label-text">${esc(e.nombre)}</span>
+                <div class="stat-bar-group">
+                  <div class="stat-bar-track">
+                    <div class="stat-bar-fill ${foldKey(e.nombre) === 'atendido' ? 'fill-green' : 'fill-orange'}" style="width: ${fillW}%;"></div>
+                  </div>
+                  <span class="stat-val-text">${e.conteo} (${e.pct}%)</span>
+                </div>
+              </div>
+            `;
+          }).join('') : `<div style="color:#94A3B8;font-size:9px;padding:8px 0;">No hay solicitudes en este periodo</div>`}
+        </div>
+
+        <div class="col-card">
+          <div class="section-header">
+            <div class="section-accent-bar"></div>
+            <h2 class="section-title">CABECERA Y COMUNIDADES</h2>
+          </div>
+          ${tipoSolSorted.length > 0 ? tipoSolSorted.map((t) => {
+            const pct = t.solicitudes > 0 ? Math.round((t.atendidas / t.solicitudes) * 100) : 0;
+            return `
+              <div class="horizontal-stat-row">
+                <span class="stat-label-text">${esc(t.nombre)}</span>
+                <div class="stat-bar-group">
+                  <div class="stat-bar-track">
+                    <div class="stat-bar-fill" style="width: ${totalSolicitudes > 0 ? Math.max(6, Math.round((t.solicitudes / totalSolicitudes) * 100)) : 0}%;"></div>
+                  </div>
+                  <span class="stat-val-text">${t.solicitudes} sol. · ${t.lamparas} lám. · ${pct}%</span>
+                </div>
+              </div>
+            `;
+          }).join('') : `<div style="color:#94A3B8;font-size:9px;padding:8px 0;">Sin solicitudes para clasificar</div>`}
+          <div class="lamp-summary-note">
+            ${totalSolicitudes > 0 ? (lamparasSolicitadas / totalSolicitudes).toFixed(1) : '0.0'} lámparas por solicitud
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-header">
+          <div class="section-accent-bar"></div>
+          <h2 class="section-title">SOLICITUDES POR LOCALIDAD</h2>
+        </div>
+        <div class="loc-table-container">
+          ${locSolSorted.length > 0 ? locSolSorted.map((loc) => {
+            const pctAt = loc.total > 0 ? (loc.atendidas / loc.total) * 100 : 0;
+            const pctPend = loc.total > 0 ? (loc.pendientes / loc.total) * 100 : 0;
+            const barWidth = Math.max(8, Math.round((loc.total / maxLocSol) * 100));
+            return `
+              <div class="loc-row">
+                <span class="loc-name">${esc(loc.nombre)}</span>
+                <div class="loc-bar-container">
+                  <div class="loc-bar-track" style="width: ${barWidth}%;">
+                    <div class="loc-bar-atendidos" style="width: ${pctAt}%;"></div>
+                    <div class="loc-bar-pendientes" style="width: ${pctPend}%;"></div>
+                  </div>
+                  <span class="loc-count-label">${loc.total}</span>
+                </div>
+                <div style="text-align: right;">
+                  <span class="loc-lamp-badge">${loc.lamparas}</span>
+                </div>
+              </div>
+            `;
+          }).join('') : `<div style="color:#94A3B8;font-size:9px;padding:8px 0;">No hay solicitudes en este periodo</div>`}
+          <div class="loc-legend">
+            <div class="legend-item"><div class="legend-box" style="background:#0E1F38;"></div><span>Atendidas</span></div>
+            <div class="legend-item"><div class="legend-box" style="background:#F59E0B;"></div><span>Sin atender</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-header">
+          <div class="section-accent-bar"></div>
+          <h2 class="section-title">DETALLE Y SOLICITUDES MÁS ANTIGUAS SIN ATENDER</h2>
+        </div>
+        <table class="table-sheet2">
+          <thead>
+            <tr>
+              <th>LOCALIDAD</th>
+              <th>SOLICITUDES</th>
+              <th>LÁMPARAS</th>
+              <th>ATENDIDAS</th>
+              <th>SIN ATENDER</th>
+              <th style="width: 110px;">% ATENCIÓN</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${locSolSorted.map((loc) => {
+              const pct = loc.total > 0 ? Math.round((loc.atendidas / loc.total) * 100) : 0;
+              return `
+                <tr class="tr-loc-main">
+                  <td>${esc(loc.nombre)}</td>
+                  <td>${loc.total}</td>
+                  <td>${loc.lamparas}</td>
+                  <td>${loc.atendidas}</td>
+                  <td>${loc.pendientes}</td>
+                  <td>
+                    <span class="table-progress-bar"><span class="table-progress-fill" style="width: ${pct}%;"></span></span>
+                    ${pct}%
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+            <tr class="tr-total-general">
+              <td>TOTAL GENERAL</td>
+              <td>${totalSolicitudes}</td>
+              <td>${lamparasSolicitadas}</td>
+              <td>${solicitudesAtendidas.length}</td>
+              <td>${solicitudesNoAtendidas.length}</td>
+              <td>
+                <span class="table-progress-bar"><span class="table-progress-fill" style="width: ${efectividadSol}%;"></span></span>
+                ${efectividadSol}%
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table class="pendientes-table" style="margin-top: 12px;">
+          <thead>
+            <tr>
+              <th>SOLICITANTE</th>
+              <th>LOCALIDAD</th>
+              <th>LÁMPARAS</th>
+              <th>ESTATUS</th>
+              <th style="text-align: right;">ANTIGÜEDAD</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${solicitudesPrioritarias.length > 0 ? solicitudesPrioritarias.map((s) => `
+              <tr>
+                <td><strong>${esc(s.solicitante)}</strong></td>
+                <td>${esc(s.localidad)}</td>
+                <td>${s.lamparas}</td>
+                <td>${esc(s.estatus)}</td>
+                <td style="text-align: right;"><span class="badge-antiguedad ${s.antiguedadClase}">${s.antiguedadLabel}</span></td>
+              </tr>
+            `).join('') : `
+              <tr>
+                <td colspan="5" style="text-align: center; color: #94A3B8; padding: 12px;">No hay solicitudes sin atender en este periodo</td>
+              </tr>
+            `}
+          </tbody>
+        </table>
+        ${solicitudesNoAtendidas.length > solicitudesPrioritarias.length ? `
+          <div class="lamp-summary-note">Se listan las ${solicitudesPrioritarias.length} solicitudes sin atender más antiguas, de ${solicitudesNoAtendidas.length}.</div>
+        ` : ''}
+      </div>
+    </div>
+
+    <footer class="sheet-footer">
+      <span>Alumbrado Público · Instalación de lámparas · ${locSolSorted.length} localidades</span>
+      <span>Página 3 de 3</span>
     </footer>
   </article>
 

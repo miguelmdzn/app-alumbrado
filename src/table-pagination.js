@@ -14,17 +14,27 @@ export class TablePaginator {
     storageKey = null,
     estimatedRowHeight = 44,
     chromeHeight = 310,
+    overflowAllowance = 0,
   }) {
     this.containerId = containerId;
     this.onPageChange = onPageChange;
     this.storageKey = storageKey;
     this.estimatedRowHeight = estimatedRowHeight;
     this.chromeHeight = chromeHeight;
+    this.overflowAllowance = overflowAllowance;
 
     this.currentPage = 1;
     this.totalItems = 0;
     this.mode = 'auto'; // 'auto' o número fijo
     this.fixedRows = 15;
+    this._fittedRows = null;
+    this._appliedRows = null;
+    this._viewportCap = null;
+    this._rowHeight = 0;
+    this._fitCeiling = null;
+    this._measuredBodyId = null;
+    this._overflowPasses = 0;
+    this._fitting = false;
 
     if (this.storageKey) {
       try {
@@ -47,26 +57,166 @@ export class TablePaginator {
 
     // Escuchar redimensionamiento de ventana para recalcular en modo auto
     this._resizeHandler = () => {
-      if (this.mode === 'auto') {
+      if (this.mode !== 'auto') return;
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => {
+        this._fittedRows = null;
+        this._appliedRows = null;
+        this._viewportCap = null;
+        this._rowHeight = 0;
+        this._fitCeiling = null;
+        this._measuredBodyId = null;
         this.update(this.totalItems, true);
-      }
+      }, 120);
     };
     window.addEventListener('resize', this._resizeHandler);
   }
 
   destroy() {
+    clearTimeout(this._resizeTimer);
     window.removeEventListener('resize', this._resizeHandler);
   }
 
-  getRowsPerPage() {
-    if (this.mode === 'fixed') {
-      return this.fixedRows;
-    }
-    // Modo automático: calcular según la altura disponible de la ventana
+  fallbackRows() {
     const windowH = window.innerHeight || 800;
     const available = windowH - this.chromeHeight;
     const autoRows = Math.floor(available / this.estimatedRowHeight);
-    return Math.max(5, Math.min(autoRows, 60));
+    return Math.max(1, Math.min(autoRows, 60));
+  }
+
+  getRowsPerPage() {
+    if (this._appliedRows) return this._appliedRows;
+    if (this.mode === 'fixed') return this.fixedRows;
+    return this.fallbackRows();
+  }
+
+  /** Distancia desde el borde superior del documento, independiente del scroll. */
+  pageOffsetTop(el) {
+    let top = 0;
+    let node = el;
+    while (node && node !== document.body && node !== document.documentElement) {
+      top += node.offsetTop || 0;
+      const parent = node.offsetParent;
+      if (parent && parent !== document.body && parent !== document.documentElement) {
+        top += parent.clientTop || 0;
+      }
+      node = parent;
+    }
+    return top;
+  }
+
+  findTable() {
+    const pag = document.getElementById(this.containerId);
+    const scope = pag?.closest('.records-container-card')
+      || document.querySelector('.app-main-content')
+      || document;
+    const tables = scope.querySelectorAll('table.records-table');
+    for (const table of tables) {
+      if (table.closest('.print-only')) continue;
+      if (table.offsetParent === null) continue;
+      return table;
+    }
+    return null;
+  }
+
+  measureRowHeight(table) {
+    const rows = [...(table.tBodies[0]?.rows || [])].filter((row) => {
+      if (row.classList.contains('table-empty-row')) return false;
+      const cell = row.cells[0];
+      if (row.cells.length === 1 && cell && cell.colSpan > 1) return false;
+      return row.getBoundingClientRect().height > 0;
+    });
+    if (!rows.length) return this.estimatedRowHeight;
+    const heights = rows
+      .map((row) => row.getBoundingClientRect().height)
+      .filter((h) => h > 0)
+      .sort((a, b) => a - b);
+    if (!heights.length) return this.estimatedRowHeight;
+    const mid = heights[Math.floor((heights.length - 1) / 2)];
+    return Math.max(this.estimatedRowHeight, Math.ceil(mid));
+  }
+
+  spaceBelowTable(table) {
+    const pag = document.getElementById(this.containerId);
+    const pagH = pag && pag.offsetHeight >= 8 ? pag.offsetHeight : 54;
+    let below = pagH + 8;
+
+    const wrap = table.closest('.table-responsive');
+    if (wrap && wrap.scrollWidth > wrap.clientWidth + 1) {
+      below += Math.max(0, wrap.offsetHeight - wrap.clientHeight);
+    }
+
+    const card = table.closest('.records-container-card');
+    if (card) {
+      const cs = getComputedStyle(card);
+      below += parseFloat(cs.paddingBottom) || 0;
+      below += parseFloat(cs.borderBottomWidth) || 0;
+      below += parseFloat(cs.marginBottom) || 0;
+    }
+
+    const container = table.closest('.app-container');
+    if (container) {
+      below += parseFloat(getComputedStyle(container).paddingBottom) || 0;
+    }
+    return below;
+  }
+
+  /**
+   * Cuántas filas caben entre el encabezado de la tabla y el borde inferior
+   * de la ventana, dejando sitio a la paginación y al padding de la página.
+   */
+  computeFittedRows() {
+    const table = this.findTable();
+    if (!table) return null;
+
+    const bodyId = table.tBodies[0]?.id || '';
+    if (bodyId !== this._measuredBodyId) {
+      this._rowHeight = 0;
+      this._fitCeiling = null;
+      this._appliedRows = null;
+      this._measuredBodyId = bodyId;
+    }
+
+    const rowH = this.measureRowHeight(table);
+    this._rowHeight = rowH;
+
+    const theadH = table.tHead?.offsetHeight || this.estimatedRowHeight;
+    const tableTop = this.pageOffsetTop(table);
+    const budget = window.innerHeight - tableTop - theadH - this.spaceBelowTable(table) + this.overflowAllowance;
+    if (budget <= 0) return 1;
+
+    let rows = Math.floor(budget / this._rowHeight);
+    rows = Math.max(1, Math.min(rows, 80));
+    if (this._fitCeiling && rows > this._fitCeiling) return this._fitCeiling;
+    return rows;
+  }
+
+  overflowAmount() {
+    const pag = document.getElementById(this.containerId);
+    if (!pag || pag.offsetHeight < 8) return 0;
+
+    let bottom = this.pageOffsetTop(pag) + pag.offsetHeight;
+    const card = pag.closest('.records-container-card');
+    if (card) {
+      const cs = getComputedStyle(card);
+      bottom += parseFloat(cs.paddingBottom) || 0;
+      bottom += parseFloat(cs.borderBottomWidth) || 0;
+      bottom += parseFloat(cs.marginBottom) || 0;
+    }
+    const container = pag.closest('.app-container');
+    if (container) {
+      bottom += parseFloat(getComputedStyle(container).paddingBottom) || 0;
+    }
+    return bottom - window.innerHeight;
+  }
+
+  refit() {
+    this._fitting = true;
+    try {
+      this.onPageChange(this.currentPage);
+    } finally {
+      this._fitting = false;
+    }
   }
 
   getTotalPages() {
@@ -97,6 +247,26 @@ export class TablePaginator {
 
   update(total, triggerChange = false) {
     this.totalItems = total;
+
+    if (!this._fitting) {
+      const fitted = this.computeFittedRows();
+      if (fitted) this._viewportCap = fitted;
+      let target = this.mode === 'fixed'
+        ? Math.min(this.fixedRows, this._viewportCap || this.fixedRows)
+        : (this._viewportCap || this.fallbackRows());
+      if (this._fitCeiling) target = Math.min(target, this._fitCeiling);
+      target = Math.max(1, target);
+      if (target !== this._appliedRows) {
+        this._appliedRows = target;
+        this._fittedRows = target;
+        const totalPages = this.getTotalPages();
+        if (this.currentPage > totalPages) this.currentPage = totalPages;
+        if (this.currentPage < 1) this.currentPage = 1;
+        this.refit();
+        return;
+      }
+    }
+
     const container = document.getElementById(this.containerId);
     if (!container) return;
 
@@ -189,6 +359,12 @@ export class TablePaginator {
           } catch {}
         }
         this.currentPage = 1;
+        this._fittedRows = null;
+        this._appliedRows = null;
+        this._viewportCap = null;
+        this._rowHeight = 0;
+        this._fitCeiling = null;
+        this._measuredBodyId = null;
         this.onPageChange(this.currentPage);
       };
     }
@@ -222,6 +398,31 @@ export class TablePaginator {
         }
       };
     });
+
+    if (this.mode === 'auto' && this._overflowPasses < 3) {
+      const overflow = this.overflowAmount();
+      if (overflow > this.overflowAllowance + 2 && rpp > 1) {
+        const fittedNow = this.computeFittedRows();
+        let next = fittedNow && fittedNow < rpp ? fittedNow : null;
+        if (next == null) {
+          const rowH = Math.max(this._rowHeight || this.estimatedRowHeight, 1);
+          const extra = overflow - this.overflowAllowance;
+          const drop = Math.max(1, Math.ceil(extra / rowH));
+          next = Math.max(1, rpp - drop);
+        }
+        if (next < rpp) {
+          this._fittedRows = next;
+          this._appliedRows = next;
+          this._fitCeiling = next;
+          this._overflowPasses += 1;
+          const pages = this.getTotalPages();
+          if (this.currentPage > pages) this.currentPage = pages;
+          this.refit();
+          return;
+        }
+      }
+    }
+    this._overflowPasses = 0;
 
     if (triggerChange) {
       this.onPageChange(this.currentPage);

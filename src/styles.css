@@ -388,6 +388,10 @@ body {
   padding: 24px 24px 48px;
 }
 
+.app-container-fluid {
+  max-width: none;
+}
+
 /* --------------------------------------------------------------------------
    Encabezados de la Aplicación (Modo Pantalla)
    -------------------------------------------------------------------------- */
@@ -1295,6 +1299,46 @@ body {
 .td-domicilio {
   max-width: 260px;
   line-height: 1.35;
+}
+
+/* Reportes tiene muchas columnas: una sola línea por fila para mostrar
+   más registros en la altura de la pantalla. */
+#vistaReportes .records-table td,
+#vistaSolicitudes .records-table td {
+  white-space: nowrap;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+#vistaReportes .records-table th,
+#vistaSolicitudes .records-table th {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+#vistaReportes .td-clip,
+#vistaSolicitudes .td-clip {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#vistaReportes .td-clip .badge-falla,
+#vistaReportes .td-clip .badge-lampara,
+#vistaSolicitudes .td-clip .badge-falla,
+#vistaSolicitudes .td-clip .badge-lampara {
+  display: inline-block;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+#vistaReportes .records-table td.td-center,
+#vistaSolicitudes .records-table td.td-center {
+  max-width: none;
+  overflow: visible;
 }
 
 .td-tipo {

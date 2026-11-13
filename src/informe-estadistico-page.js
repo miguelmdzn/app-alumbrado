@@ -9,6 +9,7 @@ import {
   getAllReportes,
   getAllEvidencias,
   getAllPersonal,
+  getAllSolicitudesLamparas,
   getFullName,
 } from './db.js';
 
@@ -32,42 +33,52 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Si no hay filtro, usar el mes actual por defecto
   const hoy = new Date();
   const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  const toIso = (d) => d.toISOString().slice(0, 10);
+  const toLocalIso = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
 
-  const fechaIni = filtro?.fechaIni || toIso(primerDiaMes);
-  const fechaFin = filtro?.fechaFin || toIso(hoy);
+  const fechaIni = filtro?.fechaIni || toLocalIso(primerDiaMes);
+  const fechaFin = filtro?.fechaFin || toLocalIso(hoy);
 
   let allReportes = [];
   let allEvidencias = [];
   let allPersonal = [];
+  let allSolicitudes = [];
 
   try {
     const res = await Promise.all([
       getAllReportes(),
       getAllEvidencias(),
       getAllPersonal(),
+      getAllSolicitudesLamparas(),
     ]);
     allReportes = res[0] || [];
     allEvidencias = res[1] || [];
     allPersonal = res[2] || [];
+    allSolicitudes = res[3] || [];
   } catch (err) {
     console.error('Error al cargar datos para el informe:', err);
   }
 
-  // Filtrar reportes en el rango de fechas
-  const reportesFiltrados = allReportes.filter((r) => {
-    if (!r.fecha) return false;
-    return r.fecha >= fechaIni && r.fecha <= fechaFin;
-  });
+  const enRango = (fecha) => {
+    const dia = String(fecha || '').slice(0, 10);
+    return dia.length === 10 && dia >= fechaIni && dia <= fechaFin;
+  };
 
-  // Generar HTML completo con el diseño exacto del PDF integrando reportes, evidencias y personal
+  const reportesFiltrados = allReportes.filter((r) => enRango(r.fecha));
+  const solicitudesFiltradas = allSolicitudes.filter((s) => enRango(s.fecha_solicitud));
+
   const fullHtml = buildReporteEstadisticoHTML(
     reportesFiltrados,
     allEvidencias,
     allPersonal,
     fechaIni,
     fechaFin,
-    getFullName
+    getFullName,
+    solicitudesFiltradas
   );
 
   // Inyectar en el documento

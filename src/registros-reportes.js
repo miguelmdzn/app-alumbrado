@@ -54,12 +54,14 @@ const paginator = new TablePaginator({
     }
   },
   storageKey: 'paginator_reportes',
+  overflowAllowance: 88,
 });
 
 const paginatorSolicitudes = new TablePaginator({
   containerId: 'tablePagination',
   onPageChange: () => renderSolicitudesTable(allSolicitudes),
   storageKey: 'paginator_solicitudes',
+  overflowAllowance: 88,
 });
 
 const PENCIL_ICON = `
@@ -335,15 +337,12 @@ function renderTable(reportes) {
       <tr>
         <td class="td-folio">${esc(r.folio || 'S/F')}</td>
         <td class="td-datetime">${fechaFmt}</td>
-        <td>${esc(r.atendio || '—')}</td>
-        <td><strong>${esc(r.usuario || '—')}</strong></td>
-        <td class="td-domicilio">${esc(ubicacion)}</td>
-        <td>${esc(colonia)}</td>
+        
+        <td class="td-clip" title="${esc(r.usuario || '')}"><strong>${esc(r.usuario || '—')}</strong></td>
+        <td class="td-domicilio td-clip" title="${esc(ubicacion)}">${esc(ubicacion)}</td>
+        <td class="td-clip" title="${esc(colonia)}">${esc(colonia)}</td>
         <td>${esc(r.telefono || '—')}</td>
-        <td class="td-center"><strong>${r.numero_lamparas || 1}</strong></td>
-        <td><span class="badge-lampara">${esc(r.tipo_lampara || '—')}</span></td>
-        <td><span class="badge-falla">${esc(r.tipo_falla || '—')}</span></td>
-        <td><span class="badge-status badge-status-${statusGroup}">${esc(displayStatus)}</span></td>
+        
         <td class="td-center">
           <div class="table-actions">
             <button type="button" class="btn-icon-action" data-detalle="${esc(r.id)}" title="Ver detalle del reporte" aria-label="Ver detalle del reporte">${EYE_ICON}</button>
@@ -795,12 +794,12 @@ function renderSolicitudesTable(lista) {
     return `
       <tr>
         <td class="td-datetime">${fechaFmt}</td>
-        <td><strong>${esc(s.nombre_solicitante || '—')}</strong></td>
-        <td>${esc(s.tipo_localidad || '—')}</td>
+        <td class="td-clip" title="${esc(s.nombre_solicitante || '')}"><strong>${esc(s.nombre_solicitante || '—')}</strong></td>
+        <td class="td-clip" title="${esc(s.tipo_localidad || '')}">${esc(s.tipo_localidad || '—')}</td>
         <td class="td-center"><strong>${s.cantidad_lamparas || 1}</strong></td>
         <td><span class="badge-status badge-status-${statusGroup}">${esc(s.estatus || 'En espera')}</span></td>
-        <td>${esc(s.descripcion || '—')}</td>
-        <td>${esc(s.observaciones || '—')}</td>
+        <td class="td-clip" title="${esc(s.descripcion || '')}">${esc(s.descripcion || '—')}</td>
+        <td class="td-clip" title="${esc(s.observaciones || '')}">${esc(s.observaciones || '—')}</td>
         <td class="td-center">
           <div class="table-actions">
             <a class="btn-icon-action" href="solicitudes-lamparas.html?id=${encodeURIComponent(s.id)}" title="Editar solicitud" aria-label="Editar solicitud">${PENCIL_SOL_ICON}</a>
@@ -830,7 +829,7 @@ function activarVistaReportes() {
   const lbl = $('lblToggleVista');
   if (lbl) lbl.textContent = 'Solicitudes';
   if ($('pageViewTitle')) $('pageViewTitle').textContent = 'REGISTRO DE REPORTES';
-  if ($('pageViewDesc'))  $('pageViewDesc').textContent  = 'Consulta e impresión de reportes de fallas de Alumbrado Público.';
+  if ($('pageViewDesc')) $('pageViewDesc').textContent = 'Consulta e impresión de reportes de fallas de Alumbrado Público.';
 
   paginator.resetPage();
   applyFilterAndRender();
@@ -850,7 +849,7 @@ async function activarVistaSolicitudes() {
   const lbl = $('lblToggleVista');
   if (lbl) lbl.textContent = 'Reportes';
   if ($('pageViewTitle')) $('pageViewTitle').textContent = 'SOLICITUDES DE INSTALACIÓN DE LÁMPARAS';
-  if ($('pageViewDesc'))  $('pageViewDesc').textContent  = 'Consulta de solicitudes de instalación de nuevas lámparas.';
+  if ($('pageViewDesc')) $('pageViewDesc').textContent = 'Consulta de solicitudes de instalación de nuevas lámparas.';
 
   if ($('lblTotal')) $('lblTotal').textContent = '...';
 
@@ -934,11 +933,16 @@ function applyFilterAndRender() {
 function openModalInforme() {
   const hoy = new Date();
   const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  const toISO = (d) => d.toISOString().slice(0, 10);
+  const toLocalIso = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
   const ini = $('informeFechaInicio');
   const fin = $('informeFechaFin');
-  if (ini) ini.value = toISO(primerDia);
-  if (fin) fin.value = toISO(hoy);
+  if (ini) ini.value = toLocalIso(primerDia);
+  if (fin) fin.value = toLocalIso(hoy);
   $('modalGenerarInforme')?.classList.remove('hidden');
 }
 
