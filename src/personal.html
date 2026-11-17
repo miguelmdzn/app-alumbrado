@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Plantilla de Personal - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="search-guard.js" defer></script>
   <script type="module" src="personal.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -180,8 +182,8 @@
           <div class="records-toolbar">
             <div class="records-toolbar-left">
               <div class="records-search-wrapper">
-                <input type="search" id="searchInput"
-                  placeholder="Buscar por nombre, cargo, número de trabajador o checador..." class="field-input">
+                <input type="text" id="searchInput" name="filtro-personal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                  placeholder="Buscar por nombre, cargo, número de trabajador o checador..." class="field-input" role="searchbox">
               </div>
               <select id="filterEstatus" class="field-select records-status-select" aria-label="Filtrar por estatus">
                 <option value="todos">Todos</option>
@@ -274,8 +276,22 @@
         <div class="modal-actions" style="margin-top: 20px;">
           <button type="button" class="btn btn-secondary" id="btnCancelarPersonal">Cancelar</button>
           <button type="submit" class="btn btn-primary" id="btnGuardarPersonal">Guardar personal</button>
+          <button type="button" class="btn admin-delete-btn hidden" id="btnAdminDelete">Eliminar completamente</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="modalDetallePersonal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalDetallePersonalTitle">
+    <div class="modal-card modal-card-detail">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalDetallePersonalTitle">Detalle del trabajador</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarDetallePersonalX" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="detail-grid" id="modalDetallePersonalContent"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCerrarDetallePersonal">Cerrar</button>
+      </div>
     </div>
   </div>
 

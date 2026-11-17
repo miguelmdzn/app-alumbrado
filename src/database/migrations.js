@@ -354,6 +354,50 @@ const MIGRATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // v15 — Atenciones de un reporte (varias visitas ligadas por folio)
+  // -------------------------------------------------------------------------
+  {
+    version: 15,
+    name: 'create_atenciones',
+    up: `
+      CREATE TABLE IF NOT EXISTS atenciones (
+        id                TEXT PRIMARY KEY,
+        folio             TEXT NOT NULL,
+        numero            INTEGER NOT NULL DEFAULT 1,
+        fecha_atencion    TEXT,
+        hora_atencion     TEXT,
+        descripcion       TEXT,
+        latitud           REAL,
+        longitud          REAL,
+        altitud           TEXT,
+        enlace_maps       TEXT,
+        personal_atendio  TEXT,
+        foto1             TEXT,
+        foto2             TEXT,
+        created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_atenciones_folio
+        ON atenciones (folio);
+
+      CREATE INDEX IF NOT EXISTS idx_atenciones_fecha
+        ON atenciones (fecha_atencion);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v16 — Quitar personal_instalo de evidencias (sigue en lámparas instaladas)
+  // -------------------------------------------------------------------------
+  {
+    version: 16,
+    name: 'drop_personal_instalo_from_evidencias',
+    up: `
+      ALTER TABLE evidencias DROP COLUMN personal_instalo;
+    `
+  },
+
+  // -------------------------------------------------------------------------
   // → PLANTILLA para futuras tablas — copiar y ajustar
   //
   // {

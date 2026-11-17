@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lámparas Instaladas - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="search-guard.js" defer></script>
   <script type="module" src="lamparas-instaladas.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -171,7 +173,7 @@
           <div class="records-toolbar">
             <div class="records-toolbar-left">
               <div class="records-search-wrapper">
-                <input type="search" id="searchInput" class="field-input"
+                <input type="text" id="searchInput" name="filtro-lamparas" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" class="field-input" role="searchbox"
                   placeholder="Buscar por folio, tipo de lámpara, ubicación, personal...">
               </div>
             </div>

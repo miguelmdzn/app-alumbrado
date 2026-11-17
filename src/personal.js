@@ -23,6 +23,7 @@ import {
 } from './normalizer.js';
 
 import { TablePaginator } from './table-pagination.js';
+import { bindAdminDelete, unlinkFromSheets } from './admin-mode.js';
 
 import {
   enqueueRecord,
@@ -55,6 +56,7 @@ const esc = (s) =>
 let allPersonal = [];
 let lastFilteredPersonal = [];
 let editingId = null;
+let refreshAdminDelete = () => {};
 let deletingId = null;
 let toastTimeout = null;
 
@@ -63,6 +65,13 @@ const paginator = new TablePaginator({
   onPageChange: () => renderTable(lastFilteredPersonal),
   storageKey: 'paginator_personal',
 });
+
+const EYE_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </svg>
+`;
 
 const PENCIL_ICON = `
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -182,13 +191,18 @@ function renderTable(personalList) {
         <td><span class="badge-status ${statusClass}">${statusLabel}</span></td>
         <td class="td-center">
           <div class="table-actions">
+            <button type="button" class="btn-icon-action" data-ver="${esc(p.id)}" title="Ver detalle" aria-label="Ver detalle">${EYE_ICON}</button>
             <button type="button" class="btn-icon-action" data-editar="${esc(p.id)}" title="Editar trabajador" aria-label="Editar trabajador">${PENCIL_ICON}</button>
-            <button type="button" class="btn-icon-action btn-icon-action-danger" data-eliminar="${esc(p.id)}" title="Eliminar trabajador" aria-label="Eliminar trabajador">${TRASH_ICON}</button>
+            <button type="button" class="btn-icon-action btn-icon-action-danger admin-only-delete" data-eliminar="${esc(p.id)}" title="Eliminar trabajador" aria-label="Eliminar trabajador">${TRASH_ICON}</button>
           </div>
         </td>
       </tr>
     `;
   }).join('');
+
+  tbody.querySelectorAll('[data-ver]').forEach((btn) => {
+    btn.onclick = () => openDetallePersonal(btn.dataset.ver);
+  });
 
   tbody.querySelectorAll('[data-editar]').forEach((btn) => {
     btn.onclick = () => openModalPersonal(btn.dataset.editar);
@@ -257,6 +271,7 @@ function openModalPersonal(id = null) {
   }
 
   modal.classList.remove('hidden');
+  refreshAdminDelete();
   $('nombres')?.focus();
 }
 
@@ -264,7 +279,43 @@ function closeModalPersonal() {
   editingId = null;
   $('modalPersonal')?.classList.add('hidden');
   $('formPersonal')?.reset();
+  refreshAdminDelete();
 }
+
+function openDetallePersonal(id) {
+  const p = allPersonal.find((item) => item.id === id);
+  if (!p) return;
+  const content = $('modalDetallePersonalContent');
+  if (content) {
+    const rows = [
+      ['Número de trabajador', p.numero_trabajador || '—'],
+      ['Checador digital', p.numero_checador_digital || '—'],
+      ['Nombre', getFullName(p) || '—'],
+      ['Cargo', p.cargo || '—'],
+      ['Estatus', p.estatus || 'Activo'],
+    ];
+    content.innerHTML = rows.map(([label, value]) => `
+      <div class="detail-item">
+        <span class="detail-label">${esc(label)}</span>
+        <span class="detail-value"><strong>${esc(value)}</strong></span>
+      </div>
+    `).join('');
+  }
+  $('modalDetallePersonal')?.classList.remove('hidden');
+}
+
+refreshAdminDelete = bindAdminDelete({
+  isEditing: () => Boolean(editingId),
+  table: 'personal',
+  message: '¿Eliminar a este trabajador de forma permanente? Si está vinculado a Google Sheets, también se borrará de ahí.',
+  getId: () => editingId,
+  removeLocal: (id) => deletePersonal(id),
+  after: () => {
+    allPersonal = allPersonal.filter((p) => p.id !== editingId);
+    closeModalPersonal();
+    applyFilterAndRender();
+  },
+});
 
 /* --------------------------------------------------------------------------
    Gestión del Modal de Eliminación
@@ -291,8 +342,10 @@ async function confirmEliminar() {
 
   try {
     await deletePersonal(id);
+    const sheet = await unlinkFromSheets('personal', id);
     allPersonal = allPersonal.filter((p) => p.id !== id);
-    showToast('success', 'Trabajador eliminado correctamente.');
+    const extra = sheet.removed ? ' También se borró de Google Sheets.' : (sheet.linked && sheet.error ? ' No se pudo borrar de Google Sheets.' : '');
+    showToast('success', `Trabajador eliminado correctamente.${extra}`);
     applyFilterAndRender();
   } catch (err) {
     console.error('Error al eliminar trabajador:', err);
@@ -449,6 +502,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   $('btnCerrarModalPersonalX')?.addEventListener('click', closeModalPersonal);
 
   $('btnEliminarNo')?.addEventListener('click', closeModalEliminar);
+  $('btnCerrarDetallePersonal')?.addEventListener('click', () => $('modalDetallePersonal')?.classList.add('hidden'));
+  $('btnCerrarDetallePersonalX')?.addEventListener('click', () => $('modalDetallePersonal')?.classList.add('hidden'));
   $('btnEliminarSi')?.addEventListener('click', confirmEliminar);
 
   $('modalPersonal')?.addEventListener('click', (e) => {

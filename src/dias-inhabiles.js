@@ -23,6 +23,7 @@ import {
 } from './normalizer.js';
 
 import { TablePaginator } from './table-pagination.js';
+import { bindAdminDelete } from './admin-mode.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -61,6 +62,7 @@ function formatFechaLarga(fechaIso) {
 let allDias = [];
 let lastFilteredDias = [];
 let editingId = null;
+let refreshAdminDelete = () => {};
 let deletingId = null;
 let toastTimeout = null;
 
@@ -199,7 +201,7 @@ function renderTable(diasList) {
           <div class="table-actions">
             <button type="button" class="btn-icon-action" data-detalle="${esc(d.id)}" title="Ver detalle" aria-label="Ver detalle">${EYE_ICON}</button>
             <button type="button" class="btn-icon-action" data-editar="${esc(d.id)}" title="Editar día inhábil" aria-label="Editar día inhábil">${PENCIL_ICON}</button>
-            <button type="button" class="btn-icon-action btn-icon-action-danger" data-eliminar="${esc(d.id)}" title="Eliminar día inhábil" aria-label="Eliminar día inhábil">${TRASH_ICON}</button>
+            <button type="button" class="btn-icon-action btn-icon-action-danger admin-only-delete" data-eliminar="${esc(d.id)}" title="Eliminar día inhábil" aria-label="Eliminar día inhábil">${TRASH_ICON}</button>
           </div>
         </td>
       </tr>
@@ -374,6 +376,7 @@ function openModalDia(id = null) {
   }
 
   modal.classList.remove('hidden');
+  refreshAdminDelete();
   $('descDia')?.focus();
 }
 
@@ -381,7 +384,20 @@ function closeModalDia() {
   editingId = null;
   $('modalDiaInhabil')?.classList.add('hidden');
   $('formDiaInhabil')?.reset();
+  refreshAdminDelete();
 }
+
+refreshAdminDelete = bindAdminDelete({
+  isEditing: () => Boolean(editingId),
+  message: '¿Eliminar este día inhábil de forma permanente? Esta acción no se puede deshacer.',
+  getId: () => editingId,
+  removeLocal: (id) => deleteDiaInhabil(id),
+  after: () => {
+    allDias = allDias.filter((d) => d.id !== editingId);
+    closeModalDia();
+    applyFilterAndRender();
+  },
+});
 
 /* --------------------------------------------------------------------------
    Modal: Confirmación de Eliminación

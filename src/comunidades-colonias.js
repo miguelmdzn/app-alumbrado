@@ -16,6 +16,7 @@ import {
 
 import { attachInputNormalizers } from './normalizer.js';
 import { TablePaginator } from './table-pagination.js';
+import { bindAdminDelete } from './admin-mode.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -32,6 +33,7 @@ const esc = (s) =>
 // ---------------------------------------------------------------------------
 let allLocalidades = [];
 let editingId = null;
+let refreshAdminDelete = () => {};
 let deletingId = null;
 let toastTimeout = null;
 
@@ -145,7 +147,7 @@ function renderTable() {
         <div class="table-actions">
           <button type="button" class="btn-icon-action" data-ver="${esc(r.id)}" title="Ver detalle" aria-label="Ver">${EYE_ICON}</button>
           <button type="button" class="btn-icon-action" data-editar="${esc(r.id)}" title="Editar" aria-label="Editar">${PENCIL_ICON}</button>
-          <button type="button" class="btn-icon-action btn-icon-action-danger" data-eliminar="${esc(r.id)}" title="Eliminar" aria-label="Eliminar">${TRASH_ICON}</button>
+          <button type="button" class="btn-icon-action btn-icon-action-danger admin-only-delete" data-eliminar="${esc(r.id)}" title="Eliminar" aria-label="Eliminar">${TRASH_ICON}</button>
         </div>
       </td>
     </tr>
@@ -175,6 +177,7 @@ function openCreateModal() {
   if ($('inputNombreLocalidad')) $('inputNombreLocalidad').value = '';
   if ($('selectTipoLocalidad')) $('selectTipoLocalidad').value = 'Cabecera municipal';
   $('modalLocalidad')?.classList.remove('hidden');
+  refreshAdminDelete();
   $('inputNombreLocalidad')?.focus();
 }
 
@@ -188,13 +191,27 @@ function openEditModal(id) {
   if ($('inputNombreLocalidad')) $('inputNombreLocalidad').value = loc.nombre || '';
   if ($('selectTipoLocalidad')) $('selectTipoLocalidad').value = loc.tipo || 'Cabecera municipal';
   $('modalLocalidad')?.classList.remove('hidden');
+  refreshAdminDelete();
   $('inputNombreLocalidad')?.focus();
 }
 
 function closeLocalidadModal() {
   $('modalLocalidad')?.classList.add('hidden');
   editingId = null;
+  refreshAdminDelete();
 }
+
+refreshAdminDelete = bindAdminDelete({
+  isEditing: () => Boolean(editingId),
+  message: '¿Eliminar esta localidad de forma permanente? Esta acción no se puede deshacer.',
+  getId: () => editingId,
+  removeLocal: (id) => deleteLocalidad(id),
+  after: () => {
+    allLocalidades = allLocalidades.filter((r) => r.id !== editingId);
+    closeLocalidadModal();
+    renderTable();
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Modal detalle

@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Solicitud de lámpara - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="search-guard.js" defer></script>
   <script type="module" src="solicitudes-lamparas.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -208,6 +210,7 @@
             <button type="submit" class="btn btn-primary" id="btnSaveSolicitud">Guardar solicitud</button>
             <button type="button" class="btn btn-secondary" id="btnResetSolicitud">Limpiar campos</button>
             <a href="registros-reportes.html" class="btn btn-secondary">Ver reportes / solicitudes</a>
+            <button type="button" class="btn admin-delete-btn hidden" id="btnAdminDelete">Eliminar completamente</button>
           </div>
         </form>
 

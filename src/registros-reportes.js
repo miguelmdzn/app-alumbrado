@@ -16,7 +16,9 @@ import {
   syncOfficialHolidays,
   getActiveHolidaysSet,
   countBusinessDays,
+  estatusPorDiasHabiles,
   getAllSolicitudesLamparas,
+  getAtencionesParaImpresion,
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
@@ -37,7 +39,9 @@ const esc = (s) =>
 const fd = (s) => (s ? s.split('-').reverse().join('/') : '');
 
 let allReportes = [];
+let atencionesPorFolio = new Map();
 let pendingAttendId = null;
+let detalleReporteId = null;
 let lastFilteredReportes = [];
 
 /* Vista activa: 'reportes' | 'solicitudes' */
@@ -159,7 +163,18 @@ function closeOpcionesModal() {
   $('modalOpcionesAtendido')?.classList.add('hidden');
 }
 
+function atencionesUrl(page) {
+  const r = allReportes.find((item) => item.id === detalleReporteId);
+  if (!r) return null;
+  const query = new URLSearchParams({
+    folio: r.folio || '',
+    reporteId: r.id || '',
+  });
+  return `${page}?${query.toString()}`;
+}
+
 function openDetalleModal(id) {
+  detalleReporteId = id;
   const r = allReportes.find((item) => item.id === id);
   if (!r) return;
 
@@ -284,6 +299,7 @@ async function finalizarYAnadirEvidencia() {
 
     const query = new URLSearchParams({
       folio: reporte.folio || '',
+      solicita: reporte.usuario || '',
       tipo: tipo,
       ubicacion: ubicacion
     });
@@ -398,14 +414,7 @@ async function updateReportesStatusByBusinessDays(reportesList, todayIso, holida
     }
 
     const businessDays = countBusinessDays(r.fecha, todayIso, holidaysSet);
-    let targetStatus = 'En espera';
-    if (businessDays >= 10) {
-      targetStatus = 'Urgente';
-    } else if (businessDays >= 5) {
-      targetStatus = 'Pendiente';
-    } else {
-      targetStatus = 'En espera';
-    }
+    const targetStatus = estatusPorDiasHabiles(businessDays);
 
     if (s !== targetStatus) {
       r.estatus = targetStatus;
@@ -521,7 +530,11 @@ function renderPrintDocument(reportes) {
     </thead>
   `;
 
+  let stripeIndex = 0;
+
   const renderPrintRow = (r, isAnterior) => {
+    const stripe = stripeIndex % 2 === 0 ? 'print-stripe-a' : 'print-stripe-b';
+    stripeIndex += 1;
     const fechaFmt = fd(r.fecha) || '—';
     const solicitante = esc(r.usuario || '—');
     const telefono = r.telefono ? `Tel. ${esc(r.telefono)}` : 'Tel. —';
@@ -564,7 +577,7 @@ function renderPrintDocument(reportes) {
     const obsText = (r.observaciones || '').trim();
     const obsRow = obsText
       ? `
-        <tr class="print-row-observaciones ${isAnterior ? 'print-row-anterior' : 'print-row-dia'}">
+        <tr class="print-row-observaciones ${stripe}">
           <td colspan="6" class="col-observaciones">
             <span class="print-obs-label">Observaciones:</span> <span class="print-obs-text">${esc(obsText)}</span>
           </td>
@@ -572,8 +585,25 @@ function renderPrintDocument(reportes) {
       `
       : '';
 
+    const atenciones = atencionesPorFolio.get(String(r.folio || '').trim().toLowerCase()) || [];
+    const atencionesRow = atenciones.length
+      ? `
+        <tr class="print-row-atenciones ${stripe}">
+          <td colspan="6" class="col-atenciones">
+            <div class="print-atenciones-title">Atenciones (${atenciones.length})</div>
+            ${atenciones.map((item) => `
+              <div class="print-atencion-line">
+                <span class="print-atencion-fecha">${esc(fd(item.fecha) || '—')}</span>
+                <span class="print-atencion-desc">${esc(item.descripcion || '—')}</span>
+              </div>
+            `).join('')}
+          </td>
+        </tr>
+      `
+      : '';
+
     return `
-      <tr class="${isAnterior ? 'print-row-anterior' : 'print-row-dia'} ${obsText ? 'has-observaciones' : ''}">
+      <tr class="${isAnterior ? 'print-row-anterior' : 'print-row-dia'} ${stripe} ${obsText ? 'has-observaciones' : ''}">
         <td class="col-folio">${esc(r.folio || 'S/F')}</td>
         <td class="col-fecha">${fechaCellHtml}</td>
         <td class="col-solicitante">
@@ -594,6 +624,7 @@ function renderPrintDocument(reportes) {
         </td>
       </tr>
       ${obsRow}
+      ${atencionesRow}
     `;
   };
 
@@ -601,7 +632,8 @@ function renderPrintDocument(reportes) {
 
   // 0. Sección: SOLICITUDES DE LÁMPARAS (Aparece hasta arriba si hay registradas)
   if (allSolicitudes && allSolicitudes.length > 0) {
-    const solicitudesPrintRows = allSolicitudes.map((s) => {
+    const solicitudesPrintRows = allSolicitudes.map((s, index) => {
+      const stripe = index % 2 === 0 ? 'print-stripe-a' : 'print-stripe-b';
       const solicitante = esc(s.nombre_solicitante || '—');
       const telefono = esc(s.telefono || '—');
       const colonia = esc(s.colonia_comunidad || '—');
@@ -610,7 +642,7 @@ function renderPrintDocument(reportes) {
       const descText = esc(s.descripcion || '—');
 
       return `
-        <tr class="print-row-dia">
+        <tr class="print-row-dia ${stripe}">
           <td class="col-solicitante">
             <div class="print-title-bold">${solicitante}</div>
           </td>
@@ -802,6 +834,7 @@ function renderSolicitudesTable(lista) {
         <td class="td-clip" title="${esc(s.observaciones || '')}">${esc(s.observaciones || '—')}</td>
         <td class="td-center">
           <div class="table-actions">
+            <button type="button" class="btn-icon-action" data-detalle-sol="${esc(s.id)}" title="Ver detalle de la solicitud" aria-label="Ver detalle de la solicitud">${EYE_ICON}</button>
             <a class="btn-icon-action" href="solicitudes-lamparas.html?id=${encodeURIComponent(s.id)}" title="Editar solicitud" aria-label="Editar solicitud">${PENCIL_SOL_ICON}</a>
           </div>
         </td>
@@ -809,7 +842,36 @@ function renderSolicitudesTable(lista) {
     `;
   }).join('');
 
+  tbody.querySelectorAll('[data-detalle-sol]').forEach((btn) => {
+    btn.onclick = () => openDetalleSolicitud(btn.dataset.detalleSol);
+  });
+
   paginator.update(lista.length);
+}
+
+function openDetalleSolicitud(id) {
+  const s = allSolicitudes.find((item) => item.id === id);
+  const content = $('modalDetalleSolicitudContent');
+  if (!s || !content) return;
+  const fecha = fd(s.fecha_solicitud) || '—';
+  const rows = [
+    ['Solicitante', s.nombre_solicitante || '—'],
+    ['Teléfono', s.telefono || '—'],
+    ['Fecha', fecha],
+    ['Tipo de localidad', s.tipo_localidad || '—'],
+    ['Colonia o comunidad', s.colonia_comunidad || '—'],
+    ['Lámparas', String(s.cantidad_lamparas || 1)],
+    ['Estatus', s.estatus || 'En espera'],
+    ['Descripción', s.descripcion || '—'],
+    ['Observaciones', s.observaciones || '—'],
+  ];
+  content.innerHTML = rows.map(([label, value]) => `
+    <div class="detail-item">
+      <span class="detail-label">${esc(label)}</span>
+      <span class="detail-value">${esc(value)}</span>
+    </div>
+  `).join('');
+  $('modalDetalleSolicitud')?.classList.remove('hidden');
 }
 
 /* --------------------------------------------------------------------------
@@ -1018,9 +1080,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   try {
     allReportes = await getAllReportes();
+    atencionesPorFolio = await getAtencionesParaImpresion();
   } catch (err) {
     console.error('Error al cargar reportes:', err);
     allReportes = [];
+    atencionesPorFolio = new Map();
   }
 
   // Pre-cargar solicitudes de instalación para estadísticas y vista de impresión
@@ -1051,6 +1115,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   $('btnCerrarDetalle')?.addEventListener('click', closeDetalleModal);
   $('btnCerrarDetalleX')?.addEventListener('click', closeDetalleModal);
+  const closeDetalleSolicitud = () => $('modalDetalleSolicitud')?.classList.add('hidden');
+  $('btnCerrarDetalleSol')?.addEventListener('click', closeDetalleSolicitud);
+  $('btnCerrarDetalleSolX')?.addEventListener('click', closeDetalleSolicitud);
+  $('btnAgregarAtencion')?.addEventListener('click', () => {
+    const url = atencionesUrl('atencion.html');
+    if (url) window.location.href = url;
+  });
+  $('btnVerAtenciones')?.addEventListener('click', () => {
+    const url = atencionesUrl('atenciones.html');
+    if (url) window.location.href = url;
+  });
 
   $('modalAtendido')?.addEventListener('click', (e) => {
     if (e.target === $('modalAtendido')) closeAttendModal();

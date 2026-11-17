@@ -178,7 +178,7 @@ function renderTable(records) {
           <div class="table-actions">
             <button type="button" class="btn-icon-action" data-ver="${esc(r.id)}" title="Ver detalle de la evidencia" aria-label="Ver detalle de la evidencia">${EYE_ICON}</button>
             <a class="btn-icon-action" href="index.html?edit=${encodeURIComponent(r.id)}" title="Editar evidencia" aria-label="Editar evidencia">${PENCIL_ICON}</a>
-            <button type="button" class="btn-icon-action btn-icon-action-danger" data-del="${esc(r.id)}" title="Eliminar evidencia" aria-label="Eliminar evidencia">${TRASH_ICON}</button>
+            <button type="button" class="btn-icon-action btn-icon-action-danger admin-only-delete" data-del="${esc(r.id)}" title="Eliminar evidencia" aria-label="Eliminar evidencia">${TRASH_ICON}</button>
           </div>
         </td>
       </tr>
@@ -211,7 +211,6 @@ function openDetalleEvidenciaModal(id) {
   if (!content) return;
 
   const atendioFmt = formatAtendioDisplay(r.atendio) || '—';
-  const instaloFmt = formatAtendioDisplay(r.personalInstalo || r.personal_instalo) || '—';
   const fechaFmt = fd(r.fecha) || '—';
   const horaFmt = r.hora ? `${r.hora} hrs` : '—';
   const coords = (r.lat != null && r.lon != null) ? `${r.lat}, ${r.lon}` : '—';
@@ -254,10 +253,6 @@ function openDetalleEvidenciaModal(id) {
     <div class="detail-item" style="grid-column: span 2;">
       <span class="detail-label">Personal que atendió:</span>
       <span class="detail-value"><strong>${esc(atendioFmt)}</strong></span>
-    </div>
-    <div class="detail-item" style="grid-column: span 2;">
-      <span class="detail-label">Personal que instaló:</span>
-      <span class="detail-value"><strong>${esc(instaloFmt)}</strong></span>
     </div>
     <div class="detail-item">
       <span class="detail-label">Tipo de reporte:</span>
@@ -492,9 +487,7 @@ function applyFilterAndRender() {
       const solicita = (r.solicita || '').toLowerCase();
       const atendioRaw = (r.atendio || '').toLowerCase();
       const atendioNom = formatAtendioDisplay(r.atendio).toLowerCase();
-      const instaloRaw = (r.personalInstalo || r.personal_instalo || '').toLowerCase();
-      const instaloNom = formatAtendioDisplay(r.personalInstalo || r.personal_instalo).toLowerCase();
-      return folio.includes(query) || tipo.includes(query) || ubicacion.includes(query) || solicita.includes(query) || atendioRaw.includes(query) || atendioNom.includes(query) || instaloRaw.includes(query) || instaloNom.includes(query);
+      return folio.includes(query) || tipo.includes(query) || ubicacion.includes(query) || solicita.includes(query) || atendioRaw.includes(query) || atendioNom.includes(query);
     });
   }
 

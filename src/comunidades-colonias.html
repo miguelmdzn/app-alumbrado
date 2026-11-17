@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comunidades y Colonias - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="search-guard.js" defer></script>
   <script type="module" src="comunidades-colonias.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -170,8 +172,8 @@
           <div class="records-toolbar">
             <div class="records-toolbar-left">
               <div class="records-search-wrapper">
-                <input type="search" id="searchLocalidades"
-                  placeholder="Buscar por nombre o tipo..." class="field-input">
+                <input type="text" id="searchLocalidades" name="filtro-localidades" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                  placeholder="Buscar por nombre o tipo..." class="field-input" role="searchbox">
               </div>
               <select id="filterTipo" class="field-select records-status-select" aria-label="Filtrar por tipo">
                 <option value="">TODOS LOS TIPOS</option>
@@ -231,6 +233,7 @@
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="btnCancelarLocalidad">Cancelar</button>
           <button type="submit" class="btn btn-primary" id="btnGuardarLocalidad">Guardar</button>
+          <button type="button" class="btn admin-delete-btn hidden" id="btnAdminDelete">Eliminar completamente</button>
         </div>
       </form>
     </div>

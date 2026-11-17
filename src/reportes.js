@@ -15,10 +15,16 @@ import {
   initDatabase,
   saveReporte,
   getReporteById,
+  deleteReporte,
   searchLocalidades,
+  syncOfficialHolidays,
+  getActiveHolidaysSet,
+  countBusinessDays,
+  estatusPorDiasHabiles,
 } from './db.js';
 
 import { processSyncQueue } from './database/repositories/syncQueue.js';
+import { bindAdminDelete } from './admin-mode.js';
 
 import {
   attachInputNormalizers,
@@ -26,6 +32,10 @@ import {
 } from './normalizer.js';
 
 const $ = (id) => document.getElementById(id);
+
+let holidaysSet = null;
+let estatusElegidoPorUsuario = false;
+let aplicandoEstatusAutomatico = false;
 
 const today = () => {
   const d = new Date();
@@ -35,6 +45,7 @@ const today = () => {
 
 let toastTimeout = null;
 let editingId = null;
+let refreshAdminDelete = () => {};
 let editingEstatus = 'En espera';
 
 /* --------------------------------------------------------------------------
@@ -188,6 +199,7 @@ function setupConditionalFields() {
   const otroEstatus = $('otroEstatus');
 
   estatus?.addEventListener('change', () => {
+    if (!aplicandoEstatusAutomatico) estatusElegidoPorUsuario = true;
     if (estatus.value === 'Otro') {
       wrapOtroEstatus?.classList.remove('hidden');
       otroEstatus?.focus();
@@ -211,6 +223,7 @@ function setEditMode(active) {
     if (pageTitle) pageTitle.textContent = 'Editar reporte';
     if (btn) btn.textContent = 'Guardar cambios';
     document.title = 'Editar reporte - Alumbrado Público';
+    refreshAdminDelete();
     return;
   }
 
@@ -220,7 +233,19 @@ function setEditMode(active) {
   if (pageTitle) pageTitle.textContent = 'Nuevo Reporte de Falla';
   if (btn) btn.textContent = 'Guardar reporte';
   document.title = 'Nuevo Reporte de Falla - Alumbrado Público';
+  refreshAdminDelete();
 }
+
+refreshAdminDelete = bindAdminDelete({
+  isEditing: () => Boolean(editingId),
+  table: 'reportes',
+  message: '¿Eliminar este reporte de forma permanente? Si está vinculado a Google Sheets, también se borrará de ahí.',
+  getId: () => editingId,
+  removeLocal: (id) => deleteReporte(id),
+  after: () => {
+    window.location.href = 'registros-reportes.html';
+  },
+});
 
 function applySelectValue(selectEl, storedValue, wrapEl, otherInput) {
   const raw = String(storedValue || '').trim();
@@ -254,6 +279,29 @@ function applySelectValue(selectEl, storedValue, wrapEl, otherInput) {
   selectEl.selectedIndex = 0;
   wrapEl?.classList.add('hidden');
   if (otherInput) otherInput.value = '';
+}
+
+async function cargarDiasInhabiles() {
+  try {
+    await syncOfficialHolidays();
+    holidaysSet = await getActiveHolidaysSet();
+  } catch (err) {
+    console.warn('No se pudieron cargar los días inhábiles:', err);
+    holidaysSet = null;
+  }
+}
+
+function aplicarEstatusPorFecha() {
+  if (editingId || estatusElegidoPorUsuario) return;
+  const fecha = $('fecha')?.value;
+  const estatus = $('estatus');
+  if (!fecha || !estatus) return;
+
+  const days = countBusinessDays(fecha, today(), holidaysSet);
+  aplicandoEstatusAutomatico = true;
+  estatus.value = estatusPorDiasHabiles(days);
+  estatus.dispatchEvent(new Event('change'));
+  aplicandoEstatusAutomatico = false;
 }
 
 function fillForm(reporte) {
@@ -315,10 +363,11 @@ function resetForm() {
 
   $('wrapOtroLampara')?.classList.add('hidden');
   $('wrapOtroFalla')?.classList.add('hidden');
-  if ($('estatus')) $('estatus').value = 'En espera';
   $('wrapOtroEstatus')?.classList.add('hidden');
   if ($('otroEstatus')) $('otroEstatus').value = '';
+  estatusElegidoPorUsuario = false;
   setEditMode(false);
+  aplicarEstatusPorFecha();
 
   $('folio').focus();
 }
@@ -426,15 +475,25 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('Error al conectar base de datos:', err);
   }
 
+  await cargarDiasInhabiles();
+
   setupConditionalFields();
   setupColoniaAutocomplete();
   attachInputNormalizers(document);
 
-  if ($('fecha')) $('fecha').value = today();
+  if ($('fecha')) {
+    $('fecha').value = today();
+    $('fecha').addEventListener('change', () => {
+      estatusElegidoPorUsuario = false;
+      aplicarEstatusPorFecha();
+    });
+  }
 
   const editId = new URLSearchParams(window.location.search).get('id');
   if (editId) {
     await loadReporteForEdit(editId);
+  } else {
+    aplicarEstatusPorFecha();
   }
 
   // Sincronización automática al recuperar conexión

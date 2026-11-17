@@ -14,7 +14,9 @@
       }
     }
   </style>
+  <script src="search-guard.js" defer></script>
   <script type="module" src="registros-reportes.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -219,7 +221,7 @@
             <div class="records-toolbar">
               <div class="records-toolbar-left">
                 <div class="records-search-wrapper">
-                  <input type="search" id="searchInput" placeholder="" class="field-input">
+                  <input type="text" id="searchInput" name="filtro-reportes" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="" class="field-input" role="searchbox">
                 </div>
                 <!-- Filtro de estatus: solo visible en vista reportes -->
                 <select id="filterEstatus" class="field-select records-status-select"
@@ -388,6 +390,19 @@
     </div>
   </div>
 
+  <div id="modalDetalleSolicitud" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalDetalleSolicitudTitle">
+    <div class="modal-card modal-card-detail">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalDetalleSolicitudTitle">Detalle de la solicitud</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarDetalleSolX" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="detail-grid" id="modalDetalleSolicitudContent"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCerrarDetalleSol">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal 3: Ver detalle completo del reporte -->
   <div id="modalDetalleReporte" class="modal-overlay hidden" role="dialog" aria-modal="true"
     aria-labelledby="modalDetalleTitle">
@@ -398,6 +413,8 @@
       </div>
       <div class="detail-grid" id="modalDetalleContent"></div>
       <div class="modal-actions">
+        <button type="button" class="btn btn-primary" id="btnAgregarAtencion">Agregar atención</button>
+        <button type="button" class="btn btn-secondary" id="btnVerAtenciones">Ver atenciones</button>
         <button type="button" class="btn btn-secondary" id="btnCerrarDetalle">Cerrar</button>
       </div>
     </div>

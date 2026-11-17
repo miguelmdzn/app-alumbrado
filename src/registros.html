@@ -7,7 +7,9 @@
   <title>Registro de Evidencias - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
   <script src="qrcode.min.js"></script>
+  <script src="search-guard.js" defer></script>
   <script type="module" src="registros.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -186,8 +188,8 @@
           <section class="records-container-card">
             <div class="records-toolbar">
               <div class="records-search-wrapper">
-                <input type="search" id="searchInput" placeholder="Buscar por folio, tipo o domicilio..."
-                  class="field-input">
+                <input type="text" id="searchInput" name="filtro-evidencias" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Buscar por folio, tipo o domicilio..."
+                  class="field-input" role="searchbox">
               </div>
 
               <div class="records-stats-summary">

@@ -363,3 +363,14 @@ export function countBusinessDays(startDateStr, endDateStr, holidaysSet = null) 
   return businessDays;
 }
 
+/**
+ * Estatus sugerido según los días hábiles transcurridos desde el reporte.
+ * 0 a 4: En espera. 5 a 9: Pendiente. 10 o más: Urgente.
+ */
+export function estatusPorDiasHabiles(businessDays) {
+  const days = Number(businessDays) || 0;
+  if (days >= 10) return 'Urgente';
+  if (days >= 5) return 'Pendiente';
+  return 'En espera';
+}
+

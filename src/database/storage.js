@@ -2,30 +2,67 @@
  * ============================================================================
  * DATABASE / STORAGE — GESTIÓN DE ARCHIVOS DE EVIDENCIAS EN DISCO
  * ============================================================================
- * Estructura de carpetas en disco:
- *   evidencias/
- *     └── [Año] (ej. 2026)
- *         └── [Mes] (ej. 11-Noviembre)
- *             └── [Semana] (ej. Semana-45)
- *                 └── [Día] (ej. Dia-04)
- *                     └── [Folio]_foto[1|2]_[id].jpg
+ * El día de la ruta es el primer día en que se adjuntó una foto a ese folio.
+ * Las atenciones posteriores, aunque sean de otra fecha, cuelgan del mismo día:
  *
- * En la Base de Datos (SQLite) se almacena únicamente la referencia relativa:
- *   "2026/11-Noviembre/Semana-45/Dia-04/AP-2026-001_foto1_3b12f1df.jpg"
+ *   evidencias/
+ *     └── [Año]
+ *         └── [Mes]
+ *             └── [Semana]
+ *                 └── [Día de la primera foto]
+ *                     └── [Folio]
+ *                         ├── [Folio]_foto1_[id].jpg          (evidencias)
+ *                         ├── 01ATENCION_2026-11-16/
+ *                         │     └── [Folio]_foto1_[id].jpg
+ *                         └── 02ATENCION_2026-11-20/
+ *                               └── [Folio]_foto1_[id].jpg
+ *
+ * En SQLite solo se guarda la referencia relativa.
  * ============================================================================
  */
 
 // Caché en memoria para evitar lecturas repetidas de disco
 const _imageCache = new Map();
 
+/** Fecha local YYYY-MM-DD (no UTC). */
+export function localTodayIso() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 /**
- * Guarda una imagen en la jerarquía de carpetas física (Año/Mes/Semana/Día).
- * Retorna la referencia relativa para almacenar en la BD.
+ * Extrae la fecha ancla de una ruta ya guardada.
+ * Sirve tanto para la estructura nueva (.../Dia-16/FOLIO/...) como para la anterior.
  */
-export async function saveEvidenceFile(base64Data, dateStr, folio, photoIndex, reportId) {
+export function anchorDateFromRelativePath(relativePath) {
+  if (!relativePath || String(relativePath).startsWith('data:')) return null;
+  const match = String(relativePath).match(/^(\d{4})\/(\d{2})-[^/]+\/Semana-\d+\/Dia-(\d{2})(?:\/|$)/);
+  if (!match) return null;
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+export function earliestAnchorDate(paths) {
+  const dates = (paths || []).map(anchorDateFromRelativePath).filter(Boolean).sort();
+  return dates[0] || null;
+}
+
+/** Carpeta de una atención: 01ATENCION_2026-11-16 */
+export function attentionFolderName(numero, fecha) {
+  const n = Math.max(1, Number(numero) || 1);
+  const label = String(n).padStart(2, '0');
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(String(fecha || '')) ? fecha : localTodayIso();
+  return `${label}ATENCION_${day}`;
+}
+
+/**
+ * Guarda una imagen bajo Año/Mes/Semana/Día/Folio[/subcarpeta].
+ * `dateStr` debe ser el día ancla del folio.
+ * `subfolder` vacío deja la foto dentro de la carpeta del folio (evidencias).
+ */
+export async function saveEvidenceFile(base64Data, dateStr, folio, photoIndex, reportId, subfolder = '') {
   if (!base64Data) return null;
 
-  // Si ya es una ruta relativa existente en disco (no es base64 data URL), devolverla tal cual
   if (!base64Data.startsWith('data:image/') && !base64Data.startsWith('data:')) {
     return base64Data;
   }
@@ -36,13 +73,13 @@ export async function saveEvidenceFile(base64Data, dateStr, folio, photoIndex, r
     try {
       const relativePath = await invoke('save_evidence_image', {
         base64Data,
-        dateStr: dateStr || new Date().toISOString().slice(0, 10),
+        dateStr: dateStr || localTodayIso(),
         folio: folio || 'reporte',
         photoIndex: Number(photoIndex) || 1,
-        reportId: String(reportId || Date.now())
+        reportId: String(reportId || Date.now()),
+        subfolder: subfolder || null,
       });
 
-      // Guardar en caché en memoria la dataURL asociada a esta ruta
       _imageCache.set(relativePath, base64Data);
       return relativePath;
     } catch (err) {
@@ -50,8 +87,86 @@ export async function saveEvidenceFile(base64Data, dateStr, folio, photoIndex, r
     }
   }
 
-  // Fallback para entorno web (conservar DataURL en IndexedDB)
   return base64Data;
+}
+
+export async function getEvidenceRelativeDir(dateStr, folio, subfolder = '') {
+  const invoke = window.__TAURI__?.core?.invoke;
+  if (typeof invoke !== 'function') return null;
+  try {
+    return await invoke('evidence_relative_dir', {
+      dateStr: dateStr || localTodayIso(),
+      folio: folio || 'reporte',
+      subfolder: subfolder || null,
+    });
+  } catch (err) {
+    console.error('[Storage] No se pudo armar la carpeta:', err);
+    return null;
+  }
+}
+
+export async function moveEvidenceFile(relativePath, newRelativeDir) {
+  if (!relativePath || !newRelativeDir) return relativePath;
+  const invoke = window.__TAURI__?.core?.invoke;
+  if (typeof invoke !== 'function') return relativePath;
+  const moved = await invoke('move_evidence_file', {
+    relativePath,
+    newRelativeDir,
+  });
+  if (moved && moved !== relativePath && _imageCache.has(relativePath)) {
+    _imageCache.set(moved, _imageCache.get(relativePath));
+    _imageCache.delete(relativePath);
+  }
+  return moved || relativePath;
+}
+
+/**
+ * Coloca una foto en la carpeta definitiva.
+ * Si ya es una ruta y la carpeta cambió (otra fecha de atención), la mueve.
+ */
+export async function placeEvidencePhoto(ref, { dateStr, folio, photoIndex, reportId, subfolder = '' }) {
+  if (!ref) return null;
+
+  if (String(ref).startsWith('data:image/') || String(ref).startsWith('data:')) {
+    return saveEvidenceFile(ref, dateStr, folio, photoIndex, reportId, subfolder);
+  }
+
+  const targetDir = await getEvidenceRelativeDir(dateStr, folio, subfolder);
+  if (!targetDir) return ref;
+
+  const currentDir = String(ref).split('/').slice(0, -1).join('/');
+  if (currentDir === targetDir) return ref;
+
+  try {
+    return await moveEvidenceFile(ref, targetDir);
+  } catch (err) {
+    console.warn('[Storage] No se movió la foto; se conserva la ruta anterior:', err);
+    return ref;
+  }
+}
+
+/**
+ * Guarda o quita una foto y borra el archivo anterior si fue reemplazado.
+ */
+export async function commitEvidencePhoto(nextRef, previousRef, options) {
+  if (!nextRef) {
+    if (previousRef && !String(previousRef).startsWith('data:')) {
+      await deleteEvidenceFile(previousRef);
+    }
+    return null;
+  }
+
+  const saved = await placeEvidencePhoto(nextRef, options);
+  const savedOnDisk = saved && !String(saved).startsWith('data:');
+  if (
+    previousRef &&
+    previousRef !== saved &&
+    savedOnDisk &&
+    !String(previousRef).startsWith('data:')
+  ) {
+    await deleteEvidenceFile(previousRef);
+  }
+  return saved;
 }
 
 /**

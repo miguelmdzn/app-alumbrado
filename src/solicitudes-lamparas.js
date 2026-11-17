@@ -8,11 +8,13 @@ import {
   saveSolicitudLampara,
   getAllSolicitudesLamparas,
   getSolicitudLamparaById,
+  deleteSolicitudLampara,
   searchLocalidades,
   findOrCreateLocalidad,
 } from './db.js';
 
 import { attachInputNormalizers, normalizeFinal } from './normalizer.js';
+import { bindAdminDelete } from './admin-mode.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +36,7 @@ const fd = (s) => (s ? s.split('-').reverse().join('/') : '');
 
 let toastTimeout = null;
 let editingId = null;
+let refreshAdminDelete = () => {};
 
 /* --------------------------------------------------------------------------
    Autocomplete de Colonia / Comunidad
@@ -162,13 +165,25 @@ function setEditMode(active) {
     if (title) title.textContent = 'Editar solicitud de lámpara';
     if (pageTitle) pageTitle.textContent = 'Editar solicitud de lámpara';
     if (btn) btn.textContent = 'Guardar cambios';
+    refreshAdminDelete();
     return;
   }
   editingId = null;
   if (title) title.textContent = 'Nueva solicitud de lámpara';
   if (pageTitle) pageTitle.textContent = 'Solicitud de instalación de lámpara';
   if (btn) btn.textContent = 'Guardar solicitud';
+  refreshAdminDelete();
 }
+
+refreshAdminDelete = bindAdminDelete({
+  isEditing: () => Boolean(editingId),
+  message: '¿Eliminar esta solicitud de forma permanente? Esta acción no se puede deshacer.',
+  getId: () => editingId,
+  removeLocal: (id) => deleteSolicitudLampara(id),
+  after: () => {
+    window.location.href = 'registros-reportes.html';
+  },
+});
 
 function resetForm() {
   const form = $('solicitudForm');

@@ -112,6 +112,41 @@ export async function markSynced(queueId) {
 /**
  * Registra un fallo en la sincronización conservando el error y aumentando reintentos.
  */
+export async function hasQueueRecord(tableName, recordId) {
+  const conn = getSQLite();
+  if (!conn || !isSQLiteReady() || !tableName || !recordId) return false;
+
+  try {
+    const rows = await conn.select(
+      `SELECT id FROM ${TABLE} WHERE table_name = $1 AND record_id = $2 LIMIT 1;`,
+      [tableName, String(recordId)]
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (err) {
+    console.error('[SyncQueue] Error al buscar registro en cola:', err);
+    return false;
+  }
+}
+
+/**
+ * Quita el registro de la cola para que un pendiente no vuelva a crearse en Sheets.
+ */
+export async function discardQueueRecord(tableName, recordId) {
+  const conn = getSQLite();
+  if (!conn || !isSQLiteReady() || !tableName || !recordId) return false;
+
+  try {
+    await conn.execute(
+      `DELETE FROM ${TABLE} WHERE table_name = $1 AND record_id = $2;`,
+      [tableName, String(recordId)]
+    );
+    return true;
+  } catch (err) {
+    console.error('[SyncQueue] Error al descartar registro de la cola:', err);
+    return false;
+  }
+}
+
 export async function markFailed(queueId, errorMessage) {
   const conn = getSQLite();
   if (!conn || !isSQLiteReady()) return;

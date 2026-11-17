@@ -15,11 +15,13 @@ import {
   generateUUID,
   saveLamparaInstalada,
   getLamparaInstaladaById,
+  deleteLamparaInstalada,
   getAllPersonal,
   getFullName,
 } from './db.js';
 
 import { attachInputNormalizers, normalizeFinal } from './normalizer.js';
+import { bindAdminDelete } from './admin-mode.js';
 import { parseMapsInput, generateQrDataUrl } from './geo-utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -46,6 +48,7 @@ const esc = (s) =>
 let fotos = [null, null];
 let toastTimeout = null;
 let editingId = null;
+let refreshAdminDelete = () => {};
 
 // Catálogo de personal y multiselect
 let allPersonal = [];
@@ -597,6 +600,7 @@ function resetForm() {
   $('pageTitle').textContent = 'Ingreso de Instalación de Lámpara LED';
   $('btnSave').textContent = 'Guardar instalación';
   $('btnCancel')?.classList.add('hidden');
+  refreshAdminDelete();
   $('folio')?.focus();
 }
 
@@ -647,7 +651,18 @@ function fillForm(row) {
   $('pageTitle').textContent = 'Editar Instalación de Lámpara LED';
   $('btnSave').textContent = 'Guardar cambios';
   $('btnCancel')?.classList.remove('hidden');
+  refreshAdminDelete();
 }
+
+refreshAdminDelete = bindAdminDelete({
+  isEditing: () => Boolean(editingId),
+  message: '¿Eliminar esta instalación de forma permanente? Esta acción no se puede deshacer.',
+  getId: () => editingId,
+  removeLocal: (id) => deleteLamparaInstalada(id),
+  after: () => {
+    window.location.href = 'lamparas-instaladas.html';
+  },
+});
 
 // Envío del formulario
 $('formLampara').onsubmit = async (e) => {

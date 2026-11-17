@@ -168,7 +168,7 @@ function renderTable(records) {
             <a class="btn-icon-action" href="nueva-lampara.html?edit=${encodeURIComponent(r.id)}" title="Editar instalación">
               ${PENCIL_ICON}
             </a>
-            <button type="button" class="btn-icon-action btn-icon-action-danger" data-del="${esc(r.id)}" title="Eliminar instalación">
+            <button type="button" class="btn-icon-action btn-icon-action-danger admin-only-delete" data-del="${esc(r.id)}" title="Eliminar instalación">
               ${TRASH_ICON}
             </button>
           </div>

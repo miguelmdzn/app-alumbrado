@@ -147,6 +147,53 @@ fn calculate_hierarchy(date_str: &str) -> (String, String, String, String) {
     (year.to_string(), month_folder, week_folder, day_folder)
 }
 
+/// Carpeta relativa: Año/Mes/Semana/Día/Folio[/subcarpeta]
+/// El día lo define quien llama (primer día en que el reporte recibió una foto).
+fn build_relative_dir(date_str: &str, folio: &str, subfolder: Option<&str>) -> String {
+    let (year, month, week, day) = calculate_hierarchy(date_str);
+    let safe_folio = sanitize_folio(folio);
+    let sub = subfolder.unwrap_or("").trim();
+    if sub.is_empty() {
+        format!("{}/{}/{}/{}/{}", year, month, week, day, safe_folio)
+    } else {
+        format!(
+            "{}/{}/{}/{}/{}/{}",
+            year,
+            month,
+            week,
+            day,
+            safe_folio,
+            sanitize_folio(sub)
+        )
+    }
+}
+
+fn join_relative(base: &PathBuf, relative: &str) -> PathBuf {
+    let mut path = base.clone();
+    for part in relative.split(['/', '\\']) {
+        if part.is_empty() || part == "." || part == ".." {
+            continue;
+        }
+        path.push(part);
+    }
+    path
+}
+
+fn cleanup_empty_dirs(mut dir: PathBuf, stop: &PathBuf) {
+    loop {
+        if dir.as_path() == stop.as_path() || !dir.starts_with(stop) {
+            break;
+        }
+        if fs::remove_dir(&dir).is_err() {
+            break;
+        }
+        match dir.parent() {
+            Some(parent) => dir = parent.to_path_buf(),
+            None => break,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Comandos Tauri invocables desde el Frontend
 // ---------------------------------------------------------------------------
@@ -156,8 +203,10 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-/// Guarda una imagen de evidencia en la jerarquía: año / mes / semana / día
-/// Retorna la ruta relativa para ser guardada en la base de datos
+/// Guarda una imagen en Año/Mes/Semana/Día/Folio[/subcarpeta].
+/// `date_str` es el día ancla (primera foto del reporte), no necesariamente la fecha capturada.
+/// `subfolder` vacío deja el archivo dentro del folio (evidencias).
+/// Para atenciones se usa, por ejemplo, "01ATENCION_2026-11-16".
 #[tauri::command]
 fn save_evidence_image(
     app: tauri::AppHandle,
@@ -166,26 +215,21 @@ fn save_evidence_image(
     folio: String,
     photo_index: u8,
     report_id: String,
+    subfolder: Option<String>,
 ) -> Result<String, String> {
     if base64_data.is_empty() {
         return Ok("".into());
     }
 
-    // 1. Decodificar la imagen Base64 a bytes
     let image_bytes = base64_decode(&base64_data)?;
-
-    // 2. Obtener la carpeta base de evidencias
     let base_dir = get_evidencias_base_dir(&app)?;
-
-    // 3. Calcular la jerarquía cronológica
-    let (year, month, week, day) = calculate_hierarchy(&date_str);
-    let target_dir = base_dir.join(&year).join(&month).join(&week).join(&day);
+    let rel_dir = build_relative_dir(&date_str, &folio, subfolder.as_deref());
+    let target_dir = join_relative(&base_dir, &rel_dir);
 
     if !target_dir.exists() {
         fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
     }
 
-    // 4. Generar nombre de archivo único y ordenado
     let safe_folio = sanitize_folio(&folio);
     let short_id = if report_id.len() >= 8 {
         &report_id[..8]
@@ -193,14 +237,69 @@ fn save_evidence_image(
         "img"
     };
     let file_name = format!("{}_foto{}_{}.jpg", safe_folio, photo_index, short_id);
-
-    // 5. Escribir el archivo en disco
     let file_path = target_dir.join(&file_name);
     fs::write(&file_path, image_bytes).map_err(|e| e.to_string())?;
 
-    // 6. Retornar referencia relativa universal con barras inclinadas '/'
-    let relative_path = format!("{}/{}/{}/{}/{}", year, month, week, day, file_name);
-    Ok(relative_path)
+    Ok(format!("{}/{}", rel_dir, file_name))
+}
+
+/// Devuelve la carpeta relativa (sin nombre de archivo) para un folio y subcarpeta.
+#[tauri::command]
+fn evidence_relative_dir(
+    date_str: String,
+    folio: String,
+    subfolder: Option<String>,
+) -> String {
+    build_relative_dir(&date_str, &folio, subfolder.as_deref())
+}
+
+/// Mueve una imagen ya guardada a otra carpeta relativa, conservando el nombre del archivo.
+#[tauri::command]
+fn move_evidence_file(
+    app: tauri::AppHandle,
+    relative_path: String,
+    new_relative_dir: String,
+) -> Result<String, String> {
+    if relative_path.is_empty() || relative_path.starts_with("data:") {
+        return Ok(relative_path);
+    }
+    if relative_path.contains("..") || new_relative_dir.contains("..") {
+        return Err("Ruta de evidencia no permitida".into());
+    }
+
+    let base_dir = get_evidencias_base_dir(&app)?;
+    let src = join_relative(&base_dir, &relative_path);
+    if !src.exists() {
+        return Err(format!(
+            "El archivo de evidencia no existe: {}",
+            src.display()
+        ));
+    }
+
+    let file_name = src
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .ok_or_else(|| "Nombre de archivo inválido".to_string())?;
+
+    let dest_dir = join_relative(&base_dir, &new_relative_dir);
+    fs::create_dir_all(&dest_dir).map_err(|e| e.to_string())?;
+    let dest = dest_dir.join(&file_name);
+
+    if src != dest {
+        if dest.exists() {
+            let _ = fs::remove_file(&dest);
+        }
+        if fs::rename(&src, &dest).is_err() {
+            fs::copy(&src, &dest).map_err(|e| e.to_string())?;
+            let _ = fs::remove_file(&src);
+        }
+        if let Some(parent) = src.parent() {
+            cleanup_empty_dirs(parent.to_path_buf(), &base_dir);
+        }
+    }
+
+    let dir = new_relative_dir.trim_matches('/');
+    Ok(format!("{}/{}", dir, file_name))
 }
 
 /// Lee una imagen desde su referencia relativa y la devuelve como Data URL base64
@@ -551,6 +650,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             save_evidence_image,
+            evidence_relative_dir,
+            move_evidence_file,
             read_evidence_image,
             get_evidence_folder_path,
             open_evidence_folder,
@@ -568,6 +669,25 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn evidence_dir_groups_folio_and_attention() {
+        let evidence = build_relative_dir("2026-11-16", "AP-2026-001", None);
+        assert_eq!(
+            evidence,
+            "2026/11-Noviembre/Semana-46/Dia-16/AP-2026-001"
+        );
+
+        let attention = build_relative_dir(
+            "2026-11-16",
+            "AP-2026-001",
+            Some("02ATENCION_2026-11-20"),
+        );
+        assert_eq!(
+            attention,
+            "2026/11-Noviembre/Semana-46/Dia-16/AP-2026-001/02ATENCION_2026-11-20"
+        );
+    }
 
     #[test]
     fn test_obfuscation_roundtrip() {

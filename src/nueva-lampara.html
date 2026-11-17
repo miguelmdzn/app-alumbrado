@@ -7,7 +7,9 @@
   <title>Instalación de Lámpara LED - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
   <script src="qrcode.min.js"></script>
+  <script src="search-guard.js" defer></script>
   <script type="module" src="nueva-lampara.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -296,6 +298,7 @@
             <button type="button" class="btn btn-secondary" id="btnResetForm">Limpiar campos</button>
             <button type="button" class="btn btn-secondary hidden" id="btnCancel">Cancelar edición</button>
             <a href="lamparas-instaladas.html" class="btn btn-secondary">Ver registros de lámparas</a>
+            <button type="button" class="btn admin-delete-btn hidden" id="btnAdminDelete">Eliminar completamente</button>
           </div>
         </form>
 

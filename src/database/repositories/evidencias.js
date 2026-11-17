@@ -5,10 +5,9 @@
  * Repositorio exclusivo de la tabla `evidencias` (bitácora diaria).
  *
  * En la Base de Datos SQLite se almacena ÚNICAMENTE la referencia relativa:
- *   "2026/11-Noviembre/Semana-45/Dia-04/AP-2026-001_foto1_3b12f1df.jpg"
+ *   "2026/11-Noviembre/Semana-46/Dia-16/AP-2026-001/AP-2026-001_foto1_3b12f1df.jpg"
  *
- * Las imágenes físicas se guardan en disco divididas por:
- *   Año -> Mes -> Semana -> Día
+ * El día de la carpeta es el primer día en que ese folio recibió una foto.
  * ============================================================================
  */
 
@@ -23,10 +22,12 @@ import {
 } from '../core.js';
 
 import {
-  saveEvidenceFile,
   loadEvidenceFile,
-  deleteEvidenceFile
+  deleteEvidenceFile,
+  commitEvidencePhoto,
+  localTodayIso,
 } from '../storage.js';
+import { resolveFolioAnchorDate } from '../photoAnchor.js';
 
 const TABLE = 'evidencias';
 
@@ -45,7 +46,6 @@ function toRecord(report, uuid, refFoto1, refFoto2) {
     fecha_atencion:   report.fecha            || '',
     hora_atencion:    report.hora             || '',
     personal_atendio: report.atendio          || '',
-    personal_instalo: report.personalInstalo  || report.personal_instalo || '',
     turno:            report.turno            || 'Matutino',
     ubicacion:        report.ubicacion        || '',
     latitud:          isValidCoord(report.lat)  ? Number(report.lat) : null,
@@ -71,8 +71,6 @@ function toFrontend(r) {
     fecha:           r.fecha_atencion   || '',
     hora:            r.hora_atencion    || '',
     atendio:         r.personal_atendio || '',
-    personalInstalo: r.personal_instalo || '',
-    personal_instalo: r.personal_instalo || '',
     turno:           r.turno            || 'Matutino',
     ubicacion:       r.ubicacion        || '',
     lat:             isValidCoord(r.latitud)  ? Number(r.latitud)  : null,
@@ -96,22 +94,42 @@ function toFrontend(r) {
  * Inserta o actualiza un reporte en la BD.
  * Guarda las fotos en disco (Año/Mes/Semana/Día) y guarda sus referencias relativas en la BD.
  */
+async function getExistingFotoRefs(id) {
+  if (!id) return [null, null];
+  if (isSQLiteReady()) {
+    try {
+      const rows = await getSQLite().select(
+        `SELECT foto1, foto2 FROM ${TABLE} WHERE id = $1;`,
+        [id]
+      );
+      if (!Array.isArray(rows)) return [null, null];
+      if (rows[0]) return [rows[0].foto1 || null, rows[0].foto2 || null];
+      return [null, null];
+    } catch (err) {
+      console.warn('[evidencias] No se pudieron leer fotos previas:', err);
+    }
+  }
+  const all = await idbGetAll(TABLE);
+  const row = (all || []).find((item) => item.id === id);
+  return [row?.foto1 || null, row?.foto2 || null];
+}
+
 export async function saveEvidencia(report) {
   const uuid = report.id && report.id.includes('-') ? report.id : generateUUID();
-  const dateStr = report.fecha || new Date().toISOString().slice(0, 10);
   const folio = report.folio || 'reporte';
+  const previous = await getExistingFotoRefs(uuid);
+  const anchor = (await resolveFolioAnchorDate(folio)) || localTodayIso();
 
-  // 1. Guardar fotos en la jerarquía de carpetas en disco
-  let refFoto1 = report.fotos?.[0] || report.fotoRefs?.[0] || null;
-  let refFoto2 = report.fotos?.[1] || report.fotoRefs?.[1] || null;
-
-  if (refFoto1 && (refFoto1.startsWith('data:image/') || refFoto1.startsWith('data:'))) {
-    refFoto1 = await saveEvidenceFile(refFoto1, dateStr, folio, 1, uuid);
-  }
-
-  if (refFoto2 && (refFoto2.startsWith('data:image/') || refFoto2.startsWith('data:'))) {
-    refFoto2 = await saveEvidenceFile(refFoto2, dateStr, folio, 2, uuid);
-  }
+  const refFoto1 = await commitEvidencePhoto(
+    report.fotos?.[0] || report.fotoRefs?.[0] || null,
+    previous[0],
+    { dateStr: anchor, folio, photoIndex: 1, reportId: uuid, subfolder: '' }
+  );
+  const refFoto2 = await commitEvidencePhoto(
+    report.fotos?.[1] || report.fotoRefs?.[1] || null,
+    previous[1],
+    { dateStr: anchor, folio, photoIndex: 2, reportId: uuid, subfolder: '' }
+  );
 
   const record = toRecord(report, uuid, refFoto1, refFoto2);
 
@@ -121,17 +139,16 @@ export async function saveEvidencia(report) {
       await getSQLite().execute(
         `INSERT OR REPLACE INTO ${TABLE} (
            id, folio, solicitante, fecha_atencion, hora_atencion,
-           personal_atendio, personal_instalo, turno, ubicacion, latitud, longitud,
+           personal_atendio, turno, ubicacion, latitud, longitud,
            altitud, enlace_maps, observaciones, estatus, tipo_reporte,
            foto1, foto2, updated_at
          ) VALUES (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-           $11, $12, $13, $14, $15, $16, $17, $18, CURRENT_TIMESTAMP
+           $11, $12, $13, $14, $15, $16, $17, CURRENT_TIMESTAMP
          );`,
         [
           record.id, record.folio, record.solicitante,
           record.fecha_atencion, record.hora_atencion, record.personal_atendio,
-          record.personal_instalo,
           record.turno, record.ubicacion, record.latitud, record.longitud,
           record.altitud, record.enlace_maps, record.observaciones,
           record.estatus, record.tipo_reporte, record.foto1, record.foto2,

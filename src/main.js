@@ -7,6 +7,7 @@ import {
   initDatabase,
   saveEvidencia,
   getEvidenciaById,
+  deleteEvidencia,
   saveMetadatos,
   loadMetadatos,
   generateUUID,
@@ -18,6 +19,7 @@ import {
   attachInputNormalizers,
   normalizeFinal,
 } from './normalizer.js';
+import { bindAdminDelete } from './admin-mode.js';
 
 // Utilidades para acceso a elementos y saneamiento
 const $ = (id) => document.getElementById(id);
@@ -37,8 +39,10 @@ let metaState = {
 };
 
 let fotos = [null, null];
+let fotoRefs = [null, null];
 let toastTimeout = null;
 let editingEvidenciaId = null;
+let refreshAdminDelete = () => {};
 
 /* --------------------------------------------------------------------------
    Notificaciones Toast ("Evidencia agregada correctamente" / "Ocurrió un error")
@@ -162,6 +166,7 @@ function drawDrops() {
         if (item.type.indexOf('image') === 0) {
           const blob = item.getAsFile();
           fotos[i] = await readImg(blob);
+          fotoRefs[i] = null;
           drawDrops();
           break;
         }
@@ -174,6 +179,7 @@ function drawDrops() {
       e.preventDefault();
       e.stopPropagation();
       fotos[+btn.dataset.x] = null;
+      fotoRefs[+btn.dataset.x] = null;
       drawDrops();
     };
   });
@@ -183,6 +189,7 @@ async function addFiles(files, startIdx) {
   const list = [...files].filter((f) => f.type.startsWith('image/'));
   for (let k = 0; k < list.length && (startIdx + k) < 2; k++) {
     fotos[startIdx + k] = await readImg(list[k]);
+    fotoRefs[startIdx + k] = null;
   }
   drawDrops();
 }
@@ -195,6 +202,7 @@ window.addEventListener('paste', async (e) => {
       const blob = item.getAsFile();
       const emptyIdx = fotos[0] === null ? 0 : (fotos[1] === null ? 1 : 0);
       fotos[emptyIdx] = await readImg(blob);
+      fotoRefs[emptyIdx] = null;
       drawDrops();
       break;
     }
@@ -726,180 +734,6 @@ function initAtendioMultiSelect() {
   });
 }
 
-/* --------------------------------------------------------------------------
-   Multiselect: Personal que Instaló (similar al de Atendió)
-   -------------------------------------------------------------------------- */
-let selectedInstaladorEvidenciaIds = [];
-let instaladorHighlightedIndex = -1;
-let currentFilteredInstaladores = [];
-
-function renderInstaladorEvidenciaChips() {
-  const box = $('instaladorEvidenciaChipsBox');
-  const input = $('instaladorEvidenciaSearchInput');
-  const hiddenInput = $('personalInstalo');
-  if (!box || !input) return;
-
-  box.querySelectorAll('.multiselect-chip').forEach((c) => c.remove());
-
-  selectedInstaladorEvidenciaIds.forEach((id) => {
-    const p = allPersonal.find((item) => item.id === id);
-    const name = p ? getFullName(p) : id;
-
-    const chip = document.createElement('span');
-    chip.className = 'multiselect-chip';
-    chip.dataset.id = id;
-
-    const textSpan = document.createElement('span');
-    textSpan.className = 'multiselect-chip-text';
-    textSpan.textContent = name;
-    textSpan.title = name;
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'multiselect-chip-remove';
-    removeBtn.setAttribute('aria-label', `Quitar ${name}`);
-    removeBtn.innerHTML = '&times;';
-    removeBtn.onclick = (e) => {
-      e.stopPropagation();
-      selectedInstaladorEvidenciaIds = selectedInstaladorEvidenciaIds.filter((item) => item !== id);
-      renderInstaladorEvidenciaChips();
-      $('instaladorEvidenciaSearchInput')?.focus();
-    };
-
-    chip.appendChild(textSpan);
-    chip.appendChild(removeBtn);
-    box.insertBefore(chip, input);
-  });
-
-  if (hiddenInput) {
-    hiddenInput.value = selectedInstaladorEvidenciaIds.join(',');
-  }
-}
-
-function filterInstaladorEvidenciaList(query) {
-  const q = (query || '').trim().toLowerCase();
-  const available = allPersonal.filter((p) => !selectedInstaladorEvidenciaIds.includes(p.id));
-  if (!q) return available.filter((p) => (p.estatus || 'Activo') === 'Activo').slice(0, 15);
-  return available.filter((p) => {
-    const full = getFullName(p).toLowerCase();
-    const cargo = (p.cargo || '').toLowerCase();
-    const numT = (p.numero_trabajador || '').toLowerCase();
-    return full.includes(q) || cargo.includes(q) || numT.includes(q);
-  });
-}
-
-function openInstaladorEvidenciaDropdown(query = '') {
-  const dropdown = $('instaladorEvidenciaDropdown');
-  if (!dropdown) return;
-
-  currentFilteredInstaladores = filterInstaladorEvidenciaList(query);
-  instaladorHighlightedIndex = currentFilteredInstaladores.length > 0 ? 0 : -1;
-
-  if (currentFilteredInstaladores.length === 0) {
-    dropdown.innerHTML = `<div class="multiselect-empty">${allPersonal.length > 0 ? 'No se encontró personal.' : 'No hay personal registrado.'}</div>`;
-  } else {
-    dropdown.innerHTML = currentFilteredInstaladores.map((p, idx) => {
-      const name = getFullName(p) || 'Sin nombre';
-      const cargo = p.cargo ? esc(p.cargo) : '';
-      const numT = p.numero_trabajador ? `Núm. ${esc(p.numero_trabajador)}` : '';
-      const subParts = [cargo, numT].filter(Boolean).join(' • ');
-      return `
-        <div class="multiselect-item ${idx === 0 ? 'active' : ''}" data-index="${idx}" data-id="${esc(p.id)}">
-          <div class="multiselect-item-name">${esc(name)}</div>
-          ${subParts ? `<div class="multiselect-item-sub">${subParts}</div>` : ''}
-        </div>
-      `;
-    }).join('');
-
-    dropdown.querySelectorAll('.multiselect-item').forEach((item) => {
-      item.onclick = (e) => {
-        e.stopPropagation();
-        addInstaladorEvidenciaChip(item.dataset.id);
-      };
-      item.onmouseenter = () => {
-        instaladorHighlightedIndex = Number(item.dataset.index);
-        setInstaladorEvidenciaHighlight(instaladorHighlightedIndex);
-      };
-    });
-  }
-  dropdown.classList.remove('hidden');
-}
-
-function closeInstaladorEvidenciaDropdown() {
-  instaladorHighlightedIndex = -1;
-  currentFilteredInstaladores = [];
-  $('instaladorEvidenciaDropdown')?.classList.add('hidden');
-}
-
-function setInstaladorEvidenciaHighlight(index) {
-  instaladorHighlightedIndex = index;
-  const dropdown = $('instaladorEvidenciaDropdown');
-  if (!dropdown) return;
-  dropdown.querySelectorAll('.multiselect-item').forEach((item, idx) => {
-    if (idx === instaladorHighlightedIndex) { item.classList.add('active'); item.scrollIntoView({ block: 'nearest' }); }
-    else item.classList.remove('active');
-  });
-}
-
-function addInstaladorEvidenciaChip(id) {
-  if (!id || selectedInstaladorEvidenciaIds.includes(id)) return;
-  selectedInstaladorEvidenciaIds.push(id);
-  renderInstaladorEvidenciaChips();
-  const input = $('instaladorEvidenciaSearchInput');
-  if (input) input.value = '';
-  closeInstaladorEvidenciaDropdown();
-  input?.focus();
-}
-
-function initInstaladorEvidenciaMultiSelect() {
-  const container = $('instaladorEvidenciaContainer');
-  const box = $('instaladorEvidenciaChipsBox');
-  const input = $('instaladorEvidenciaSearchInput');
-  const dropdown = $('instaladorEvidenciaDropdown');
-  if (!container || !box || !input || !dropdown) return;
-
-  input.addEventListener('focus', () => openInstaladorEvidenciaDropdown(input.value));
-  input.addEventListener('input', () => openInstaladorEvidenciaDropdown(input.value));
-
-  input.addEventListener('keydown', (e) => {
-    const isOpen = !dropdown.classList.contains('hidden');
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (!isOpen) openInstaladorEvidenciaDropdown(input.value);
-      else if (currentFilteredInstaladores.length > 0) setInstaladorEvidenciaHighlight((instaladorHighlightedIndex + 1) % currentFilteredInstaladores.length);
-      return;
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (isOpen && currentFilteredInstaladores.length > 0) setInstaladorEvidenciaHighlight((instaladorHighlightedIndex - 1 + currentFilteredInstaladores.length) % currentFilteredInstaladores.length);
-      return;
-    }
-    if (e.key === 'Enter') {
-      if (isOpen && instaladorHighlightedIndex >= 0 && currentFilteredInstaladores[instaladorHighlightedIndex]) {
-        e.preventDefault(); e.stopPropagation();
-        addInstaladorEvidenciaChip(currentFilteredInstaladores[instaladorHighlightedIndex].id);
-      } else if (isOpen) e.preventDefault();
-      return;
-    }
-    if (e.key === 'Backspace' && input.value === '') {
-      if (selectedInstaladorEvidenciaIds.length > 0) {
-        selectedInstaladorEvidenciaIds.pop();
-        renderInstaladorEvidenciaChips();
-        if (isOpen) openInstaladorEvidenciaDropdown(input.value);
-      }
-      return;
-    }
-    if (e.key === 'Escape') { closeInstaladorEvidenciaDropdown(); return; }
-  });
-
-  box.addEventListener('click', (e) => {
-    if (e.target !== input && !e.target.closest('.multiselect-chip-remove')) input.focus();
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!container.contains(e.target)) closeInstaladorEvidenciaDropdown();
-  });
-}
 
 /* --------------------------------------------------------------------------
    Operaciones de Formulario (Guardar, Limpiar)
@@ -911,7 +745,6 @@ function resetForm(preserveHelpers = true) {
     ? {
       solicita: $('solicita').value,
       atendio: $('atendio').value,
-      personalInstalo: $('personalInstalo')?.value || '',
       turno: $('turno').value
     }
     : {};
@@ -920,7 +753,6 @@ function resetForm(preserveHelpers = true) {
   $('fecha').value = metaState.fecha || today();
   $('solicita').value = keptValues.solicita || '';
   $('atendio').value = keptValues.atendio || '';
-  if ($('personalInstalo')) $('personalInstalo').value = keptValues.personalInstalo || '';
   if (keptValues.turno) $('turno').value = keptValues.turno;
 
   // Restaurar chips de personal que atendió a partir de IDs preservados
@@ -930,19 +762,13 @@ function resetForm(preserveHelpers = true) {
     .filter(Boolean);
   renderChips();
 
-  // Restaurar chips de personal que instaló a partir de IDs preservados
-  selectedInstaladorEvidenciaIds = (keptValues.personalInstalo || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  renderInstaladorEvidenciaChips();
-
   $('lat').value = '';
   $('lon').value = '';
   $('alt').value = '';
   $('geoLink').value = '';
 
   fotos = [null, null];
+  fotoRefs = [null, null];
 
   drawDrops();
   updateGeoPreview();
@@ -951,6 +777,7 @@ function resetForm(preserveHelpers = true) {
   $('formTitle').textContent = 'Nuevo Reporte de Evidencia';
   $('btnSave').textContent = 'Agregar reporte';
   $('btnCancel').classList.add('hidden');
+  refreshAdminDelete();
 }
 
 $('form').onsubmit = async (e) => {
@@ -998,7 +825,7 @@ $('form').onsubmit = async (e) => {
     lon: finalLon,
     alt: finalAlt,
     mapsUrl: finalMapsUrl,
-    fotos: [...fotos]
+    fotos: [fotoRefs[0] || fotos[0], fotoRefs[1] || fotos[1]]
   };
 
   FIELDS.forEach((field) => {
@@ -1006,7 +833,6 @@ $('form').onsubmit = async (e) => {
   });
   // Guardar IDs exactos de los trabajadores seleccionados (sin mutaciones de texto)
   reportData.atendio = $('atendio').value;
-  reportData.personalInstalo = $('personalInstalo')?.value || '';
 
   try {
     // Guardar en la base de datos (SQLite / IndexedDB + carpetas organizadas por fecha)
@@ -1031,6 +857,16 @@ $('form').onsubmit = async (e) => {
 };
 
 $('btnCancel').onclick = () => resetForm(true);
+
+refreshAdminDelete = bindAdminDelete({
+  isEditing: () => Boolean(editingEvidenciaId),
+  message: '¿Eliminar esta evidencia de forma permanente? Esta acción no se puede deshacer.',
+  getId: () => editingEvidenciaId,
+  removeLocal: (id) => deleteEvidencia(id),
+  after: () => {
+    window.location.href = 'registros.html';
+  },
+});
 
 // Sincronización de metadatos generales
 [['mFecha', 'fecha'], ['mArea', 'area'], ['mElab', 'elab'], ['mReviso', 'reviso']].forEach(([id, key]) => {
@@ -1089,7 +925,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   initAtendioMultiSelect();
-  initInstaladorEvidenciaMultiSelect();
   resetForm(false);
   attachInputNormalizers(document);
 
@@ -1104,6 +939,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         $('formTitle').textContent = 'Editar Reporte de Evidencia';
         $('btnSave').textContent = 'Guardar cambios';
         $('btnCancel').classList.remove('hidden');
+        refreshAdminDelete();
 
         if ($('folio')) $('folio').value = ev.folio || '';
         if ($('fecha')) $('fecha').value = ev.fecha || today();
@@ -1126,15 +962,8 @@ window.addEventListener('DOMContentLoaded', async () => {
           .filter(Boolean);
         renderChips();
 
-        // Restaurar chips de personal que instaló
-        selectedInstaladorEvidenciaIds = (ev.personalInstalo || ev.personal_instalo || '')
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-        renderInstaladorEvidenciaChips();
-
-        // Fotos
-        fotos = [ev.fotos?.[0] || null, ev.fotos?.[1] || null];
+        fotoRefs = [ev.fotoRefs?.[0] || null, ev.fotoRefs?.[1] || null];
+        fotos = [ev.fotos?.[0] || ev.fotoRefs?.[0] || null, ev.fotos?.[1] || ev.fotoRefs?.[1] || null];
         drawDrops();
         updateGeoPreview();
 
@@ -1148,11 +977,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Autollenado de campos si proviene de un reporte finalizado
   const pFolio = params.get('folio');
+  const pSolicita = params.get('solicita');
   const pTipo = params.get('tipo');
   const pUbicacion = params.get('ubicacion');
 
-  if (pFolio || pTipo || pUbicacion) {
+  if (pFolio || pSolicita || pTipo || pUbicacion) {
     if (pFolio && $('folio')) $('folio').value = pFolio;
+    if (pSolicita && $('solicita')) $('solicita').value = pSolicita;
     if (pTipo && $('tipo')) $('tipo').value = pTipo;
     if (pUbicacion && $('ubicacion')) $('ubicacion').value = pUbicacion;
     if ($('estatus')) $('estatus').value = 'Atendido';

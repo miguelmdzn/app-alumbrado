@@ -87,6 +87,7 @@ export {
   syncOfficialHolidays,
   getActiveHolidaysSet,
   countBusinessDays,
+  estatusPorDiasHabiles,
   getOfficialMexicanHolidays,
 } from './database/repositories/diasInhabiles.js';
 
@@ -115,3 +116,12 @@ export {
   getLamparaInstaladaById,
   deleteLamparaInstalada,
 } from './database/repositories/lamparasInstaladas.js';
+
+// ---- Repositorio: atenciones de un reporte (ligadas por folio) --------------
+export {
+  saveAtencion,
+  getAtencionesByFolio,
+  getAtencionesParaImpresion,
+  getAtencionById,
+  deleteAtencion,
+} from './database/repositories/atenciones.js';

@@ -6,7 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Días Inhábiles y Feriados - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="search-guard.js" defer></script>
   <script type="module" src="dias-inhabiles.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -170,7 +172,7 @@
         <section class="records-container-card">
           <div class="records-toolbar">
             <div class="records-search-wrapper">
-              <input type="search" id="searchInput" placeholder="Buscar por descripción o fecha (AAAA-MM-DD)..." class="field-input">
+              <input type="text" id="searchInput" name="filtro-dias" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Buscar por descripción o fecha (AAAA-MM-DD)..." class="field-input" role="searchbox">
             </div>
 
             <div class="records-filters-group">
@@ -265,6 +267,7 @@
         <div class="modal-actions" style="margin-top: 20px;">
           <button type="button" class="btn btn-secondary" id="btnCancelarDia">Cancelar</button>
           <button type="submit" class="btn btn-primary" id="btnGuardarDia">Guardar día inhábil</button>
+          <button type="button" class="btn admin-delete-btn hidden" id="btnAdminDelete">Eliminar completamente</button>
         </div>
       </form>
     </div>

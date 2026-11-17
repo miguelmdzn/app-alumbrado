@@ -91,6 +91,37 @@ body {
   justify-content: center;
   color: #F8FAFC;
   flex-shrink: 0;
+  cursor: pointer;
+}
+
+.sidebar-brand-badge.is-admin-on {
+  background: rgba(251, 191, 36, 0.32);
+  box-shadow: 0 0 0 2px #fbbf24;
+}
+
+.admin-only-delete {
+  display: none !important;
+}
+
+body.is-admin .admin-only-delete {
+  display: inline-flex !important;
+}
+
+.admin-delete-btn {
+  flex-basis: 100%;
+  margin-top: 8px;
+  background: #b91c1c;
+  color: #fff;
+  border: 1px solid #991b1b;
+}
+
+.admin-delete-btn:hover {
+  background: #991b1b;
+}
+
+.form-actions-bar,
+.modal-actions {
+  flex-wrap: wrap;
 }
 
 .sidebar-brand-text {
@@ -1523,7 +1554,19 @@ body {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.field-input[readonly] {
+  background: #F8FAFC;
+  cursor: default;
+}
+
+.records-search-wrapper .field-input[readonly],
+.autocomplete-wrapper .field-input[readonly] {
+  background: #fff;
+  cursor: text;
 }
 
 .modal-card-detail {
@@ -2455,6 +2498,43 @@ body {
   word-break: break-word;
 }
 
+/* Cada reporte alterna el fondo, incluidas observaciones y atenciones */
+.print-reports-table tr.print-stripe-a td {
+  background-color: #FFFFFF !important;
+}
+
+.print-reports-table tr.print-stripe-b td {
+  background-color: #E4EAF3 !important;
+}
+
+.print-atenciones-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  color: #0F172A;
+  margin-bottom: 3px;
+}
+
+.print-atencion-line {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 10.5px;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.print-atencion-fecha {
+  font-weight: 700;
+  min-width: 72px;
+  color: #0F172A;
+}
+
+.print-atencion-desc {
+  color: #1E293B;
+}
+
 /* Fila de pendientes anteriores: sombreado slate sutil */
 .print-row-anterior {
   background-color: #E2E8F0 !important;
@@ -2641,6 +2721,12 @@ body {
   .print-reports-table tr {
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  .print-reports-table tr.print-stripe-a td,
+  .print-reports-table tr.print-stripe-b td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .print-row-observaciones td {

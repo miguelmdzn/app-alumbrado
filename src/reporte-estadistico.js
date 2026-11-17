@@ -414,7 +414,6 @@ export function buildReporteEstadisticoHTML(
     const evidenciasFolio = evidenciasByFolio.get(String(r.folio || '').trim().toLowerCase()) || [];
     evidenciasFolio.forEach((ev) => {
       splitPersonas(ev.atendio).forEach((token) => tokens.add(token));
-      splitPersonas(ev.personalInstalo || ev.personal_instalo).forEach((token) => tokens.add(token));
     });
 
     let alguien = false;

@@ -7,7 +7,9 @@
   <title>Ingreso de Evidencias - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
   <script src="qrcode.min.js"></script>
+  <script src="search-guard.js" defer></script>
   <script type="module" src="main.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
 </head>
 
 <body>
@@ -235,18 +237,6 @@
               <input type="hidden" id="atendio" value="">
             </div>
 
-            <div class="field col-2">
-              <span class="field-label">Personal que instaló</span>
-              <div class="multiselect-container" id="instaladorEvidenciaContainer">
-                <div class="multiselect-box" id="instaladorEvidenciaChipsBox">
-                  <input type="text" id="instaladorEvidenciaSearchInput" class="multiselect-input" placeholder="Buscar instalador..."
-                    autocomplete="off">
-                </div>
-                <div class="multiselect-dropdown hidden" id="instaladorEvidenciaDropdown" role="listbox"></div>
-              </div>
-              <input type="hidden" id="personalInstalo" value="">
-            </div>
-
             <label class="field col-1">
               <span class="field-label">Turno</span>
               <select id="turno" class="field-select">
@@ -337,6 +327,7 @@
           <div class="form-actions-bar">
             <button type="submit" class="btn btn-primary" id="btnSave">Agregar reporte</button>
             <button type="button" class="btn btn-secondary hidden" id="btnCancel">Cancelar edición</button>
+            <button type="button" class="btn admin-delete-btn hidden" id="btnAdminDelete">Eliminar completamente</button>
           </div>
         </form>
 
