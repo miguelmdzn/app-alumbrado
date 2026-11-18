@@ -125,3 +125,19 @@ export {
   getAtencionById,
   deleteAtencion,
 } from './database/repositories/atenciones.js';
+
+// ---- Repositorio: catálogo de vehículos (control de combustibles) ----------
+export {
+  saveVehiculo,
+  getAllVehiculos,
+  getVehiculoById,
+  deleteVehiculo,
+} from './database/repositories/vehiculos.js';
+
+// ---- Repositorio: bitácoras de combustible (no mueven el presupuesto) -------
+export {
+  saveBitacoraGasolina,
+  getBitacorasGasolina,
+  getBitacoraGasolinaById,
+  deleteBitacoraGasolina,
+} from './database/repositories/bitacorasGasolina.js';

@@ -284,7 +284,7 @@ export function bindAdminDelete({
       await removeLocal(id);
     } catch (err) {
       console.error(err);
-      showToast('error', 'No se pudo eliminar el registro de la base de datos.');
+      showToast('error', err?.message || 'No se pudo eliminar el registro de la base de datos.');
       return;
     }
 

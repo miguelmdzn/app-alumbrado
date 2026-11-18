@@ -1,0 +1,251 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitácoras de combustible - Alumbrado Público</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="search-guard.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
+</head>
+
+<body>
+
+  <div id="toastNotification" class="toast-notification hidden" role="alert">
+    <div class="toast-icon" id="toastIcon"></div>
+    <span class="toast-message" id="toastMessage"></span>
+    <button type="button" class="toast-close" id="toastClose" aria-label="Cerrar">&times;</button>
+  </div>
+
+  <div class="app-shell">
+    <aside class="app-sidebar noprint">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="2" x2="12" y2="6"></line>
+            <line x1="12" y1="18" x2="12" y2="22"></line>
+            <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+            <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+            <line x1="2" y1="12" x2="6" y2="12"></line>
+            <line x1="18" y1="12" x2="22" y2="12"></line>
+            <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+            <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+          </svg>
+        </div>
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-title">Alumbrado</span>
+          <span class="sidebar-brand-sub">Público</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-menu">
+        <a href="registros-reportes.html" class="sidebar-menu-item" id="navSidebarReportes">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span>Reportes</span>
+        </a>
+
+        <a href="registros.html" class="sidebar-menu-item" id="navSidebarEvidencias">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          <span>Evidencias</span>
+        </a>
+
+        <a href="personal.html" class="sidebar-menu-item" id="navSidebarPersonal">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Personal</span>
+        </a>
+
+        <!-- Opción de primer nivel Lámparas LED -->
+        <a href="lamparas-instaladas.html" class="sidebar-menu-item" id="navSidebarLamparas">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <span>Lámparas LED</span>
+        </a>
+
+                <a href="herramientas.html" class="sidebar-menu-item active" id="navSidebarHerramientas">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+          </svg>
+          <span>Herramientas</span>
+        </a>
+      </nav>
+      <!-- Footer del Sidebar: Google Sheets -->
+      <div class="sidebar-footer">
+        <a href="personal.html?openSheets=1" class="sidebar-footer-btn" id="btnSidebarGoogleSheets" title="Sincronización con Google Sheets">
+          <svg class="sidebar-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="8" y1="13" x2="16" y2="13"></line>
+            <line x1="8" y1="17" x2="16" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span>Google Sheets</span>
+        </a>
+      </div>
+    </aside>
+
+    <div class="app-main-content">
+      <main class="app-container">
+        
+        <header class="app-top-nav">
+          <div class="nav-title-group">
+            <h1 class="app-title">Bitácoras de combustible</h1>
+            <p class="app-desc">Registro de tickets, comisiones, litros, importes, kilometraje y nivel del tanque. Estos registros no modifican el presupuesto semanal.</p>
+          </div>
+          <a href="control-combustibles.html" class="btn btn-secondary">Regresar</a>
+        </header>
+
+        <section class="records-container-card">
+          <div class="records-toolbar">
+            <div class="records-toolbar-left">
+              <div class="records-search-wrapper">
+                <input id="buscarBitacora" class="field-input" type="text" placeholder="Buscar por placa, ticket, comisión o serie" autocomplete="off" spellcheck="false">
+              </div>
+            </div>
+            <div>
+              <button type="button" class="btn btn-secondary" id="btnPdfBitacoras">Generar PDF</button>
+              <button type="button" class="btn btn-primary" id="btnNuevaBitacora">Nueva bitácora</button>
+            </div>
+          </div>
+          <p class="combustible-totals">
+            <span id="lblTotalBitacoras">0 registros</span>
+            <span>Litros: <strong id="totalLitros">0,000</strong></span>
+            <span>Importe: <strong id="totalImporte">$0.00</strong></span>
+          </p>
+          <div class="table-responsive">
+            <table class="records-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Ticket</th>
+                  <th>Placa</th>
+                  <th>Comisión</th>
+                  <th>Litros</th>
+                  <th>Importe</th>
+                  <th>Km anterior</th>
+                  <th>Km actual</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tablaBitacoras"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="records-container-card hidden" id="panelBitacora">
+          <h2 class="form-section-title" id="tituloFormBitacora">Nueva bitácora</h2>
+          <form id="formBitacora" class="form-grid" autocomplete="off">
+            <div class="field col-2">
+              <label class="field-label" for="vehiculoBitacora">Vehículo</label>
+              <select class="field-input" id="vehiculoBitacora" required></select>
+            </div>
+            <div class="field col-1">
+              <label class="field-label" for="fechaTicket">Fecha</label>
+              <input class="field-input" id="fechaTicket" type="date" required>
+            </div>
+            <div class="field col-1">
+              <label class="field-label" for="numeroTicket">Núm. de ticket</label>
+              <input class="field-input" id="numeroTicket" type="text" autocomplete="off" required>
+            </div>
+            <div class="field col-2">
+              <label class="field-label" for="lugarComision">Lugar de comisión</label>
+              <input class="field-input" id="lugarComision" type="text" autocomplete="off">
+            </div>
+            <div class="field col-1">
+              <label class="field-label" for="litros">Litros</label>
+              <input class="field-input" id="litros" type="text" inputmode="decimal" autocomplete="off" required>
+            </div>
+            <div class="field col-1">
+              <label class="field-label" for="importe">Importe</label>
+              <input class="field-input" id="importe" type="text" inputmode="decimal" autocomplete="off" required>
+            </div>
+            <div class="field col-1">
+              <label class="field-label" for="kmAnterior">Km anterior</label>
+              <input class="field-input" id="kmAnterior" type="text" inputmode="numeric" autocomplete="off">
+            </div>
+            <div class="field col-1">
+              <label class="field-label" for="kmActual">Km actual</label>
+              <input class="field-input" id="kmActual" type="text" inputmode="numeric" autocomplete="off">
+            </div>
+            <div class="field col-4">
+              <label class="field-label">Nivel del tanque al cargar</label>
+              <div id="nivelAntes"></div>
+            </div>
+            <div class="field col-4">
+              <label class="field-label">Nivel del tanque al final del día</label>
+              <div id="nivelDespues"></div>
+            </div>
+            <div class="field col-4">
+              <label class="field-label" for="observaciones">Observaciones</label>
+              <input class="field-input" id="observaciones" type="text" autocomplete="off">
+            </div>
+            <div class="col-4 form-actions-bar">
+              <button type="submit" class="btn btn-primary">Guardar bitácora</button>
+              <button type="button" class="btn btn-secondary" id="btnCancelarBitacora">Cancelar</button>
+              <button type="button" class="btn admin-delete-btn hidden" id="btnAdminDelete">Eliminar completamente</button>
+            </div>
+          </form>
+        </section>
+
+      </main>
+    </div>
+  </div>
+  <div id="modalDetalleBitacora" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 560px;">
+      <h2 class="modal-title">Detalle de la bitácora</h2>
+      <div id="detalleBitacoraCuerpo"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCerrarDetalleBitacora">Cerrar</button>
+        <button type="button" class="btn btn-primary" id="btnEditarDesdeDetalleBitacora">Editar</button>
+      </div>
+    </div>
+  </div>
+  <div id="modalPdfBitacora" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 460px;">
+      <h2 class="modal-title">Periodo del documento</h2>
+      <p class="modal-text">Indica desde qué fecha hasta qué fecha se incluyen los tickets.</p>
+      <form id="formPdfBitacora" class="form-grid" autocomplete="off">
+        <div class="field col-2">
+          <label class="field-label" for="pdfDesde">Fecha inicial</label>
+          <input class="field-input" id="pdfDesde" type="date" required>
+        </div>
+        <div class="field col-2">
+          <label class="field-label" for="pdfHasta">Fecha final</label>
+          <input class="field-input" id="pdfHasta" type="date" required>
+        </div>
+        <div class="col-4 modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelarPdf">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Generar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script type="module" src="bitacoras-combustible.js"></script>
+</body>
+
+</html>
+

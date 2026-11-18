@@ -51,7 +51,7 @@ export function isSQLiteReady() {
 // Singleton de IndexedDB (respaldo offline)
 // ---------------------------------------------------------------------------
 const IDB_NAME   = 'alumbrado_publico_idb';
-const IDB_VERSION = 7;
+const IDB_VERSION = 9;
 
 // Registro de object stores para IDB — se expande conforme se crean módulos
 const IDB_STORES = [
@@ -64,7 +64,8 @@ const IDB_STORES = [
   { name: 'solicitudes_instalacion_lamparas', keyPath: 'id' },
   { name: 'lamparas_instaladas',             keyPath: 'id' },
   { name: 'atenciones',                      keyPath: 'id' },
-  // → Agregar aquí nuevas tablas según se expanda el sistema
+  { name: 'vehiculos',                       keyPath: 'id' },
+  { name: 'bitacoras_gasolina',              keyPath: 'id' },
 ];
 
 let _idbPromise = null;
@@ -74,8 +75,11 @@ export function getIDB() {
     _idbPromise = new Promise((resolve, reject) => {
       try {
         const req = window.indexedDB.open(IDB_NAME, IDB_VERSION);
-        req.onupgradeneeded = () => {
+        req.onupgradeneeded = (event) => {
           const db = req.result;
+          if (event.oldVersion < 9 && db.objectStoreNames.contains('vehiculos')) {
+            db.deleteObjectStore('vehiculos');
+          }
           for (const store of IDB_STORES) {
             if (!db.objectStoreNames.contains(store.name)) {
               db.createObjectStore(store.name, { keyPath: store.keyPath });

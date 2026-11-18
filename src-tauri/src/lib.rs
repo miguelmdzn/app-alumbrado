@@ -1,3 +1,5 @@
+mod combustible;
+
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -642,6 +644,71 @@ async fn send_gas_record(
     }
 }
 
+fn navegador_para_pdf() -> Result<PathBuf, String> {
+    let candidatos = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ];
+    candidatos
+        .iter()
+        .map(PathBuf::from)
+        .find(|ruta| ruta.exists())
+        .ok_or_else(|| "No se encontró Edge para crear el PDF.".to_string())
+}
+
+#[tauri::command]
+fn imprimir_pdf_limpio(html: String) -> Result<(), String> {
+    let id = uuid::Uuid::new_v4();
+    let dir = std::env::temp_dir();
+    let html_path = dir.join(format!("alumbrado-{id}.html"));
+    let pdf_path = dir.join(format!("alumbrado-{id}.pdf"));
+    fs::write(&html_path, html.as_bytes()).map_err(|e| e.to_string())?;
+
+    let navegador = match navegador_para_pdf() {
+        Ok(ruta) => ruta,
+        Err(err) => {
+            let _ = fs::remove_file(&html_path);
+            return Err(err);
+        }
+    };
+    let archivo = html_path.display().to_string().replace('\\', "/");
+    let url = format!("file:///{archivo}");
+    let pdf = pdf_path.display().to_string();
+
+    let mut comando = std::process::Command::new(&navegador);
+    comando.args([
+        "--headless=new",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-pdf-header-footer",
+        "--virtual-time-budget=8000",
+        &format!("--print-to-pdf={pdf}"),
+        &url,
+    ]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        comando.creation_flags(0x08000000);
+    }
+    let salida = comando
+        .output()
+        .map_err(|e| format!("No se pudo crear el PDF: {e}"))?;
+    let _ = fs::remove_file(&html_path);
+    if !pdf_path.exists() {
+        let detalle = String::from_utf8_lossy(&salida.stderr);
+        let corto: String = detalle.chars().take(160).collect();
+        return Err(format!("No se pudo crear el PDF. {corto}"));
+    }
+
+    std::process::Command::new("explorer")
+        .arg(&pdf_path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -660,7 +727,16 @@ pub fn run() {
             save_gas_config,
             get_gas_config_status,
             test_gas_connection,
-            send_gas_record
+            send_gas_record,
+            combustible::combustible_listar_periodos,
+            combustible::combustible_detalle,
+            combustible::combustible_abrir_periodo,
+            combustible::combustible_transferir,
+            combustible::combustible_cerrar_periodo,
+            combustible::combustible_editar_movimiento,
+            combustible::combustible_eliminar_movimiento,
+            combustible::combustible_eliminar_periodo,
+            imprimir_pdf_limpio
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

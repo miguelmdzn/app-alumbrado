@@ -398,6 +398,96 @@ const MIGRATIONS = [
   },
 
   // -------------------------------------------------------------------------
+  // v17 — Control de combustibles (catálogo, bitácoras y presupuesto semanal)
+  // Los importes se guardan en centavos. El presupuesto semanal es $4,500.00.
+  // -------------------------------------------------------------------------
+  {
+    version: 17,
+    name: 'create_control_combustibles',
+    up: `
+      CREATE TABLE IF NOT EXISTS vehiculos (
+        numero_serie     TEXT PRIMARY KEY,
+        placas           TEXT,
+        marca            TEXT,
+        modelo           TEXT,
+        anio             INTEGER,
+        descripcion      TEXT,
+        num_resguardo    TEXT,
+        responsable_bien TEXT,
+        estado           TEXT NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+        created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS bitacoras_gasolina (
+        id                   TEXT PRIMARY KEY,
+        fecha_ticket         TEXT,
+        numero_ticket        TEXT,
+        lugar_comision       TEXT,
+        litros               REAL,
+        importe              INTEGER,
+        km_anterior          INTEGER,
+        km_actual            INTEGER,
+        nivel_antes_cargar   TEXT,
+        nivel_despues_carga  TEXT,
+        vehiculo_id          TEXT NOT NULL REFERENCES vehiculos(numero_serie),
+        observaciones        TEXT,
+        created_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_bitacoras_gasolina_vehiculo
+        ON bitacoras_gasolina (vehiculo_id);
+
+      CREATE INDEX IF NOT EXISTS idx_bitacoras_gasolina_fecha
+        ON bitacoras_gasolina (fecha_ticket);
+
+      CREATE INDEX IF NOT EXISTS idx_bitacoras_gasolina_ticket
+        ON bitacoras_gasolina (numero_ticket);
+
+      CREATE TABLE IF NOT EXISTS periodos_combustible (
+        id                   TEXT PRIMARY KEY,
+        fecha_inicio         TEXT NOT NULL,
+        fecha_fin            TEXT NOT NULL,
+        vehiculo_inicial_id  TEXT NOT NULL REFERENCES vehiculos(numero_serie),
+        presupuesto_inicial  INTEGER NOT NULL DEFAULT 450000 CHECK (presupuesto_inicial = 450000),
+        sobrante             INTEGER,
+        estado               TEXT NOT NULL CHECK (estado IN ('ABIERTO', 'CERRADO')),
+        created_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        closed_at            TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_periodos_combustible_estado
+        ON periodos_combustible (estado);
+
+      CREATE TABLE IF NOT EXISTS movimientos_combustible (
+        id                   TEXT PRIMARY KEY,
+        periodo_id           TEXT NOT NULL REFERENCES periodos_combustible(id),
+        vehiculo_origen_id   TEXT NOT NULL REFERENCES vehiculos(numero_serie),
+        vehiculo_destino_id  TEXT NOT NULL REFERENCES vehiculos(numero_serie),
+        importe              INTEGER NOT NULL CHECK (importe > 0),
+        fecha_movimiento     TEXT NOT NULL,
+        observaciones        TEXT,
+        created_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CHECK (vehiculo_origen_id != vehiculo_destino_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_movimientos_combustible_periodo
+        ON movimientos_combustible (periodo_id);
+    `
+  },
+
+  // -------------------------------------------------------------------------
+  // v18 — El vehículo tiene id propio. El número de serie se puede corregir.
+  // Si el cambio se interrumpe, al volver a abrir se retoma donde quedó.
+  // -------------------------------------------------------------------------
+  {
+    version: 18,
+    name: 'vehiculos_id_uuid',
+    run: migrarVehiculosUuid,
+  },
+
+  // -------------------------------------------------------------------------
   // → PLANTILLA para futuras tablas — copiar y ajustar
   //
   // {
@@ -413,6 +503,203 @@ const MIGRATIONS = [
   // },
   // -------------------------------------------------------------------------
 ];
+
+async function tablaExiste(conn, nombre) {
+  const rows = await conn.select(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = $1 LIMIT 1;`,
+    [nombre]
+  );
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+async function tablaTieneColumna(conn, nombre, columna) {
+  const rows = await conn.select(`SELECT name FROM pragma_table_info('${nombre}');`);
+  return (rows || []).some((row) => row.name === columna);
+}
+
+async function ejecutarSql(conn, sql) {
+  const statements = sql
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  for (const stmt of statements) {
+    await conn.execute(`${stmt};`);
+  }
+}
+
+async function descartarTablasViejasSiHayCopia(conn) {
+  if (!(await tablaExiste(conn, 'vehiculos_v2'))) return;
+  if (await tablaExiste(conn, 'vehiculos') && await tablaTieneColumna(conn, 'vehiculos', 'id')) return;
+  const tablas = [
+    'movimientos_combustible',
+    'periodos_combustible',
+    'bitacoras_gasolina',
+    'vehiculos',
+  ];
+  for (const nombre of tablas) {
+    if (await tablaExiste(conn, nombre) && await tablaExiste(conn, `${nombre}_v2`)) {
+      await conn.execute(`DROP TABLE ${nombre};`);
+    }
+  }
+}
+
+async function renombrarTablasV2(conn) {
+  const pares = [
+    ['movimientos_combustible_v2', 'movimientos_combustible'],
+    ['periodos_combustible_v2', 'periodos_combustible'],
+    ['bitacoras_gasolina_v2', 'bitacoras_gasolina'],
+    ['vehiculos_v2', 'vehiculos'],
+  ];
+  for (const [origen, destino] of pares) {
+    if (await tablaExiste(conn, origen) && !(await tablaExiste(conn, destino))) {
+      await conn.execute(`ALTER TABLE ${origen} RENAME TO ${destino};`);
+    }
+  }
+}
+
+const SQL_INDICES_COMBUSTIBLE = `
+  CREATE INDEX IF NOT EXISTS idx_bitacoras_gasolina_vehiculo
+    ON bitacoras_gasolina (vehiculo_id);
+  CREATE INDEX IF NOT EXISTS idx_bitacoras_gasolina_fecha
+    ON bitacoras_gasolina (fecha_ticket);
+  CREATE INDEX IF NOT EXISTS idx_bitacoras_gasolina_ticket
+    ON bitacoras_gasolina (numero_ticket);
+  CREATE INDEX IF NOT EXISTS idx_periodos_combustible_estado
+    ON periodos_combustible (estado);
+  CREATE INDEX IF NOT EXISTS idx_movimientos_combustible_periodo
+    ON movimientos_combustible (periodo_id);
+`;
+
+const SQL_VEHICULOS_UUID = `
+  CREATE TABLE vehiculos_v2 (
+    id               TEXT PRIMARY KEY,
+    numero_serie     TEXT,
+    placas           TEXT,
+    marca            TEXT,
+    modelo           TEXT,
+    anio             INTEGER,
+    descripcion      TEXT,
+    num_resguardo    TEXT,
+    responsable_bien TEXT,
+    estado           TEXT NOT NULL DEFAULT 'Activo' CHECK (estado IN ('Activo', 'Inactivo')),
+    created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  INSERT INTO vehiculos_v2 (
+    id, numero_serie, placas, marca, modelo, anio, descripcion,
+    num_resguardo, responsable_bien, estado, created_at, updated_at
+  )
+  SELECT
+    lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-' ||
+    lower(hex(randomblob(2))) || '-' || lower(hex(randomblob(2))) || '-' ||
+    lower(hex(randomblob(6))),
+    numero_serie, placas, marca, modelo, anio, descripcion,
+    num_resguardo, responsable_bien, estado, created_at, updated_at
+  FROM vehiculos;
+
+  CREATE TABLE bitacoras_gasolina_v2 (
+    id                   TEXT PRIMARY KEY,
+    fecha_ticket         TEXT,
+    numero_ticket        TEXT,
+    lugar_comision       TEXT,
+    litros               REAL,
+    importe              INTEGER,
+    km_anterior          INTEGER,
+    km_actual            INTEGER,
+    nivel_antes_cargar   TEXT,
+    nivel_despues_carga  TEXT,
+    vehiculo_id          TEXT NOT NULL REFERENCES vehiculos_v2(id),
+    observaciones        TEXT,
+    created_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  INSERT INTO bitacoras_gasolina_v2 (
+    id, fecha_ticket, numero_ticket, lugar_comision, litros, importe,
+    km_anterior, km_actual, nivel_antes_cargar, nivel_despues_carga,
+    vehiculo_id, observaciones, created_at, updated_at
+  )
+  SELECT
+    b.id, b.fecha_ticket, b.numero_ticket, b.lugar_comision, b.litros, b.importe,
+    b.km_anterior, b.km_actual, b.nivel_antes_cargar, b.nivel_despues_carga,
+    v.id, b.observaciones, b.created_at, b.updated_at
+  FROM bitacoras_gasolina b
+  JOIN vehiculos_v2 v ON v.numero_serie = b.vehiculo_id;
+
+  CREATE TABLE periodos_combustible_v2 (
+    id                   TEXT PRIMARY KEY,
+    fecha_inicio         TEXT NOT NULL,
+    fecha_fin            TEXT NOT NULL,
+    vehiculo_inicial_id  TEXT NOT NULL REFERENCES vehiculos_v2(id),
+    presupuesto_inicial  INTEGER NOT NULL DEFAULT 450000 CHECK (presupuesto_inicial = 450000),
+    sobrante             INTEGER,
+    estado               TEXT NOT NULL CHECK (estado IN ('ABIERTO', 'CERRADO')),
+    created_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    closed_at            TEXT
+  );
+
+  INSERT INTO periodos_combustible_v2 (
+    id, fecha_inicio, fecha_fin, vehiculo_inicial_id, presupuesto_inicial,
+    sobrante, estado, created_at, closed_at
+  )
+  SELECT
+    p.id, p.fecha_inicio, p.fecha_fin, v.id, p.presupuesto_inicial,
+    p.sobrante, p.estado, p.created_at, p.closed_at
+  FROM periodos_combustible p
+  JOIN vehiculos_v2 v ON v.numero_serie = p.vehiculo_inicial_id;
+
+  CREATE TABLE movimientos_combustible_v2 (
+    id                   TEXT PRIMARY KEY,
+    periodo_id           TEXT NOT NULL REFERENCES periodos_combustible_v2(id),
+    vehiculo_origen_id   TEXT NOT NULL REFERENCES vehiculos_v2(id),
+    vehiculo_destino_id  TEXT NOT NULL REFERENCES vehiculos_v2(id),
+    importe              INTEGER NOT NULL CHECK (importe > 0),
+    fecha_movimiento     TEXT NOT NULL,
+    observaciones        TEXT,
+    created_at           TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (vehiculo_origen_id != vehiculo_destino_id)
+  );
+
+  INSERT INTO movimientos_combustible_v2 (
+    id, periodo_id, vehiculo_origen_id, vehiculo_destino_id, importe,
+    fecha_movimiento, observaciones, created_at
+  )
+  SELECT
+    m.id, m.periodo_id, o.id, d.id, m.importe,
+    m.fecha_movimiento, m.observaciones, m.created_at
+  FROM movimientos_combustible m
+  JOIN vehiculos_v2 o ON o.numero_serie = m.vehiculo_origen_id
+  JOIN vehiculos_v2 d ON d.numero_serie = m.vehiculo_destino_id;
+
+  DROP TABLE movimientos_combustible;
+  DROP TABLE periodos_combustible;
+  DROP TABLE bitacoras_gasolina;
+  DROP TABLE vehiculos;
+
+  ALTER TABLE vehiculos_v2 RENAME TO vehiculos;
+  ALTER TABLE bitacoras_gasolina_v2 RENAME TO bitacoras_gasolina;
+  ALTER TABLE periodos_combustible_v2 RENAME TO periodos_combustible;
+  ALTER TABLE movimientos_combustible_v2 RENAME TO movimientos_combustible;
+`;
+
+async function migrarVehiculosUuid(conn) {
+  const hayVehiculos = await tablaExiste(conn, 'vehiculos');
+  const hayV2 = await tablaExiste(conn, 'vehiculos_v2');
+  const yaUuid = hayVehiculos && await tablaTieneColumna(conn, 'vehiculos', 'id');
+
+  if (!yaUuid && hayVehiculos && !hayV2) {
+    await ejecutarSql(conn, SQL_VEHICULOS_UUID);
+  } else if (hayV2) {
+    await descartarTablasViejasSiHayCopia(conn);
+    await renombrarTablasV2(conn);
+  }
+
+  if (!(await tablaExiste(conn, 'vehiculos')) || !(await tablaTieneColumna(conn, 'vehiculos', 'id'))) {
+    throw new Error('No se pudo preparar la tabla de vehículos.');
+  }
+  await ejecutarSql(conn, SQL_INDICES_COMBUSTIBLE);
+}
 
 /**
  * Ejecuta todas las migraciones pendientes sobre la conexión dada.
@@ -445,14 +732,17 @@ export async function runMigrations(conn) {
 
       console.info(`[Migrations] Aplicando v${migration.version}: ${migration.name}`);
 
-      // Ejecutar cada sentencia individualmente (plugin-sql no soporta multi-statement nativo)
-      const statements = migration.up
-        .split(';')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+      if (typeof migration.run === 'function') {
+        await migration.run(conn);
+      } else {
+        const statements = migration.up
+          .split(';')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
 
-      for (const stmt of statements) {
-        await conn.execute(stmt + ';');
+        for (const stmt of statements) {
+          await conn.execute(stmt + ';');
+        }
       }
 
       // Registrar como aplicada
