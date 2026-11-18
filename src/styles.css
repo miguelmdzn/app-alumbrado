@@ -1674,6 +1674,83 @@ body.is-admin .admin-only-delete {
   justify-content: center;
 }
 
+.modal-card-export {
+  width: min(520px, 100%);
+}
+
+.export-folio-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0 8px;
+  font-size: 13px;
+}
+
+.export-folio-select-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.export-folio-count {
+  color: var(--text-muted);
+}
+
+.export-folio-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border-line);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.export-folio-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-line);
+  cursor: pointer;
+  font-size: 13.5px;
+}
+
+.export-folio-item:last-child {
+  border-bottom: none;
+}
+
+.export-folio-item:hover {
+  background: #F8FAFC;
+}
+
+.export-folio-code {
+  font-weight: 700;
+  min-width: 118px;
+}
+
+.export-folio-meta {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-folio-empty {
+  margin: 0;
+  padding: 14px 12px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.export-folio-error {
+  margin: 0 0 12px;
+  color: #E11D48;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .td-coord {
   white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -2215,8 +2292,9 @@ body.is-admin .admin-only-delete {
     margin: 0 !important;
   }
 
-  /* Ocultar formulario operativo y botones */
-  .noprint {
+  /* Ocultar formulario operativo, botones y diálogos */
+  .noprint,
+  .modal-overlay {
     display: none !important;
   }
 

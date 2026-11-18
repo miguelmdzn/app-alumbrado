@@ -43,6 +43,8 @@ let atencionesPorFolio = new Map();
 let pendingAttendId = null;
 let detalleReporteId = null;
 let lastFilteredReportes = [];
+let exportFolioSource = [];
+let exportFolioSelected = new Set();
 
 /* Vista activa: 'reportes' | 'solicitudes' */
 let vistaActual = 'reportes';
@@ -430,7 +432,10 @@ async function updateReportesStatusByBusinessDays(reportesList, todayIso, holida
 /* --------------------------------------------------------------------------
    VISTA DE IMPRESIÓN OFICIAL: Diseño tabular con secciones prioritarias
    -------------------------------------------------------------------------- */
-function renderPrintDocument(reportes) {
+function renderPrintDocument(reportes, options = {}) {
+  const includeSolicitudes = options.includeSolicitudes !== false;
+  const updateScreenStats = options.updateScreenStats !== false;
+  const solicitudes = includeSolicitudes ? (allSolicitudes || []) : [];
   const container = $('reportesPrintContainer');
   if (!container) return;
 
@@ -497,7 +502,7 @@ function renderPrintDocument(reportes) {
 
   if ($('printTotalSummary')) {
     const parts = [];
-    if (allSolicitudes && allSolicitudes.length > 0) parts.push(`${allSolicitudes.length} solicitudes`);
+    if (solicitudes.length > 0) parts.push(`${solicitudes.length} solicitudes`);
     if (totalOtro > 0) parts.push(`${totalOtro} otro`);
     if (totalUrgente > 0) parts.push(`${totalUrgente} urgentes`);
     if (totalPendiente > 0) parts.push(`${totalPendiente} pendientes`);
@@ -506,13 +511,13 @@ function renderPrintDocument(reportes) {
   }
 
   // Contadores de la tabla en pantalla (solo si estamos en vista de reportes)
-  if (vistaActual === 'reportes') {
+  if (updateScreenStats && vistaActual === 'reportes') {
     const totalLamparas = reportes.reduce((acc, r) => acc + (parseInt(r.numero_lamparas, 10) || 1), 0);
     if ($('lblTotal')) $('lblTotal').textContent = total;
     if ($('lblLamparas')) $('lblLamparas').textContent = totalLamparas;
   }
 
-  if (total === 0 && (!allSolicitudes || allSolicitudes.length === 0)) {
+  if (total === 0 && solicitudes.length === 0) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-title">No hay reportes ni solicitudes para imprimir.</div></div>`;
     return;
   }
@@ -631,8 +636,8 @@ function renderPrintDocument(reportes) {
   let sectionsHtml = '';
 
   // 0. Sección: SOLICITUDES DE LÁMPARAS (Aparece hasta arriba si hay registradas)
-  if (allSolicitudes && allSolicitudes.length > 0) {
-    const solicitudesPrintRows = allSolicitudes.map((s, index) => {
+  if (solicitudes.length > 0) {
+    const solicitudesPrintRows = solicitudes.map((s, index) => {
       const stripe = index % 2 === 0 ? 'print-stripe-a' : 'print-stripe-b';
       const solicitante = esc(s.nombre_solicitante || '—');
       const telefono = esc(s.telefono || '—');
@@ -665,7 +670,7 @@ function renderPrintDocument(reportes) {
     sectionsHtml += `
       <div class="print-section print-section-otro">
         <div class="print-section-header-dark" style="background-color: #2c3e50;">
-          SOLICITUDES DE LÁMPARAS (${allSolicitudes.length} ${allSolicitudes.length === 1 ? 'SOLICITUD' : 'SOLICITUDES'})
+          SOLICITUDES DE LÁMPARAS (${solicitudes.length} ${solicitudes.length === 1 ? 'SOLICITUD' : 'SOLICITUDES'})
         </div>
         <table class="print-reports-table">
           <thead>
@@ -783,6 +788,126 @@ function renderPrintDocument(reportes) {
   }
 
   container.innerHTML = sectionsHtml;
+}
+
+function getReportesParaExportar() {
+  if (vistaActual === 'reportes') return lastFilteredReportes.slice();
+  return allReportes.slice();
+}
+
+function reporteExportId(reporte) {
+  if (reporte && reporte.id != null && reporte.id !== '') return String(reporte.id);
+  return `${reporte?.folio || ''}|${reporte?.fecha || ''}|${reporte?.usuario || ''}`;
+}
+
+function closeExportPdfModal() {
+  $('modalExportPdf')?.classList.add('hidden');
+  $('exportPdfChoice')?.classList.remove('hidden');
+  $('exportPdfFolios')?.classList.add('hidden');
+  $('exportFolioError')?.classList.add('hidden');
+}
+
+function openExportPdfModal() {
+  $('exportPdfChoice')?.classList.remove('hidden');
+  $('exportPdfFolios')?.classList.add('hidden');
+  $('exportFolioError')?.classList.add('hidden');
+  if ($('exportFolioBuscar')) $('exportFolioBuscar').value = '';
+  $('modalExportPdf')?.classList.remove('hidden');
+}
+
+function updateExportFolioCount() {
+  const label = $('exportFolioCount');
+  if (!label) return;
+  const n = exportFolioSelected.size;
+  label.textContent = n === 1 ? '1 seleccionado' : `${n} seleccionados`;
+}
+
+function foliosVisiblesParaExportar() {
+  const query = ($('exportFolioBuscar')?.value || '').trim().toLowerCase();
+  if (!query) return exportFolioSource;
+  return exportFolioSource.filter((r) => [
+    r.folio, r.usuario, r.direccion, r.colonia_comunidad, r.tipo_falla,
+  ].some((v) => String(v || '').toLowerCase().includes(query)));
+}
+
+function renderExportFolioList() {
+  const box = $('exportFolioList');
+  if (!box) return;
+  const lista = foliosVisiblesParaExportar();
+  const selectAll = $('exportFolioSelectAll');
+  if (selectAll) {
+    selectAll.checked = lista.length > 0 && lista.every((r) => exportFolioSelected.has(reporteExportId(r)));
+    selectAll.indeterminate = !selectAll.checked && lista.some((r) => exportFolioSelected.has(reporteExportId(r)));
+  }
+  if (!exportFolioSource.length) {
+    box.innerHTML = '<p class="export-folio-empty">No hay reportes para exportar.</p>';
+    updateExportFolioCount();
+    return;
+  }
+  if (!lista.length) {
+    box.innerHTML = '<p class="export-folio-empty">Ningún folio coincide con la búsqueda.</p>';
+    updateExportFolioCount();
+    return;
+  }
+  box.innerHTML = lista.map((r) => {
+    const id = reporteExportId(r);
+    const meta = [r.usuario, r.colonia_comunidad].filter(Boolean).join(' · ');
+    return `
+      <label class="export-folio-item">
+        <input type="checkbox" class="export-folio-check" value="${esc(id)}" ${exportFolioSelected.has(id) ? 'checked' : ''}>
+        <span class="export-folio-code">${esc(r.folio || 'S/F')}</span>
+        <span class="export-folio-meta">${esc(meta)}</span>
+      </label>
+    `;
+  }).join('');
+  updateExportFolioCount();
+}
+
+function openExportFoliosStep() {
+  exportFolioSource = getReportesParaExportar();
+  exportFolioSelected = new Set();
+  if ($('exportFolioBuscar')) $('exportFolioBuscar').value = '';
+  $('exportFolioError')?.classList.add('hidden');
+  $('exportPdfChoice')?.classList.add('hidden');
+  $('exportPdfFolios')?.classList.remove('hidden');
+  renderExportFolioList();
+  $('exportFolioBuscar')?.focus();
+}
+
+function restaurarVistaImpresion() {
+  if (vistaActual === 'solicitudes') {
+    renderPrintDocument(allReportes);
+  } else {
+    renderPrintDocument(lastFilteredReportes);
+  }
+}
+
+function imprimirReportes(reportes, includeSolicitudes) {
+  renderPrintDocument(reportes, {
+    includeSolicitudes,
+    updateScreenStats: false,
+  });
+  const onAfter = () => {
+    window.removeEventListener('afterprint', onAfter);
+    restaurarVistaImpresion();
+  };
+  window.addEventListener('afterprint', onAfter);
+  setTimeout(() => window.print(), 50);
+}
+
+function exportarTodosLosReportes() {
+  closeExportPdfModal();
+  imprimirReportes(getReportesParaExportar(), true);
+}
+
+function exportarFoliosSeleccionados() {
+  const picked = exportFolioSource.filter((r) => exportFolioSelected.has(reporteExportId(r)));
+  if (!picked.length) {
+    $('exportFolioError')?.classList.remove('hidden');
+    return;
+  }
+  closeExportPdfModal();
+  imprimirReportes(picked, false);
 }
 
 /* --------------------------------------------------------------------------
@@ -1167,11 +1292,47 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (!$('modalOpcionesAtendido')?.classList.contains('hidden')) closeOpcionesModal();
       if (!$('modalDetalleReporte')?.classList.contains('hidden')) closeDetalleModal();
       if (!$('modalTipoReporte')?.classList.contains('hidden')) closeTipoReporteModal();
+      if (!$('modalExportPdf')?.classList.contains('hidden')) closeExportPdfModal();
     }
   });
 
-  $('btnExportPdf')?.addEventListener('click', () => {
-    window.print();
+  $('btnExportPdf')?.addEventListener('click', openExportPdfModal);
+  $('btnCerrarExportPdfX')?.addEventListener('click', closeExportPdfModal);
+  $('btnExportTodos')?.addEventListener('click', exportarTodosLosReportes);
+  $('btnExportCiertos')?.addEventListener('click', openExportFoliosStep);
+  $('btnExportFoliosVolver')?.addEventListener('click', () => {
+    $('exportFolioError')?.classList.add('hidden');
+    $('exportPdfFolios')?.classList.add('hidden');
+    $('exportPdfChoice')?.classList.remove('hidden');
+  });
+  $('btnExportFoliosConfirmar')?.addEventListener('click', exportarFoliosSeleccionados);
+  $('exportFolioBuscar')?.addEventListener('input', renderExportFolioList);
+  $('exportFolioSelectAll')?.addEventListener('change', (e) => {
+    const marcar = e.target.checked;
+    foliosVisiblesParaExportar().forEach((r) => {
+      const id = reporteExportId(r);
+      if (marcar) exportFolioSelected.add(id);
+      else exportFolioSelected.delete(id);
+    });
+    $('exportFolioError')?.classList.add('hidden');
+    renderExportFolioList();
+  });
+  $('exportFolioList')?.addEventListener('change', (e) => {
+    const input = e.target.closest('.export-folio-check');
+    if (!input) return;
+    if (input.checked) exportFolioSelected.add(input.value);
+    else exportFolioSelected.delete(input.value);
+    $('exportFolioError')?.classList.add('hidden');
+    updateExportFolioCount();
+    const lista = foliosVisiblesParaExportar();
+    const selectAll = $('exportFolioSelectAll');
+    if (selectAll) {
+      selectAll.checked = lista.length > 0 && lista.every((r) => exportFolioSelected.has(reporteExportId(r)));
+      selectAll.indeterminate = !selectAll.checked && lista.some((r) => exportFolioSelected.has(reporteExportId(r)));
+    }
+  });
+  $('modalExportPdf')?.addEventListener('click', (e) => {
+    if (e.target === $('modalExportPdf')) closeExportPdfModal();
   });
 
   // Botón: Generar informe estadístico

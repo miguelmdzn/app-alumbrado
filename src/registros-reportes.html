@@ -282,6 +282,44 @@
 
   </div>
 
+  <!-- Modal: alcance de la exportación PDF -->
+  <div id="modalExportPdf" class="modal-overlay hidden noprint" role="dialog" aria-modal="true"
+    aria-labelledby="modalExportPdfTitle">
+    <div class="modal-card modal-card-export">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalExportPdfTitle">Exportar / Imprimir PDF</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarExportPdfX" aria-label="Cerrar">&times;</button>
+      </div>
+
+      <div id="exportPdfChoice">
+        <p class="modal-text">Elige si quieres incluir todos los reportes de la vista actual o solo algunos folios.</p>
+        <div class="modal-actions tipo-reporte-choices">
+          <button type="button" class="btn btn-primary" id="btnExportTodos">Exportar todos</button>
+          <button type="button" class="btn btn-secondary" id="btnExportCiertos">Ciertos folios</button>
+        </div>
+      </div>
+
+      <div id="exportPdfFolios" class="hidden">
+        <p class="modal-text">Marca los folios que quieres incluir en el PDF.</p>
+        <input type="text" id="exportFolioBuscar" class="field-input" placeholder="Buscar folio, solicitante o domicilio..."
+          autocomplete="off">
+        <div class="export-folio-tools">
+          <label class="export-folio-select-all">
+            <input type="checkbox" id="exportFolioSelectAll">
+            <span>Seleccionar visibles</span>
+          </label>
+          <span class="export-folio-count" id="exportFolioCount">0 seleccionados</span>
+        </div>
+        <div id="exportFolioList" class="export-folio-list"></div>
+        <p class="export-folio-error hidden" id="exportFolioError">Selecciona al menos un folio.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnExportFoliosVolver">Volver</button>
+          <button type="button" class="btn btn-primary" id="btnExportFoliosConfirmar">Exportar seleccionados</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: tipo de registro al pulsar Nuevo reporte -->
   <div id="modalTipoReporte" class="modal-overlay hidden" role="dialog" aria-modal="true"
     aria-labelledby="modalTipoReporteTitle">
