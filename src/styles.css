@@ -99,10 +99,12 @@ body {
   box-shadow: 0 0 0 2px #fbbf24;
 }
 
+.admin-only,
 .admin-only-delete {
   display: none !important;
 }
 
+body.is-admin .admin-only,
 body.is-admin .admin-only-delete {
   display: inline-flex !important;
 }
@@ -1239,6 +1241,42 @@ body.is-admin .admin-only-delete {
   width: auto;
   min-width: 148px;
   flex: 0 0 auto;
+}
+
+.advanced-search-panel {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.advanced-search-panel.hidden {
+  display: none !important;
+}
+
+.advanced-search-help,
+.advanced-search-status {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.advanced-search-panel textarea.field-input {
+  min-height: 72px;
+  resize: vertical;
+}
+
+#vistaReportes .records-table tr.busqueda-nota-row td {
+  white-space: normal;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+  padding-top: 0;
+  background: #f8fafc;
 }
 
 .records-stats-summary {
@@ -3119,6 +3157,20 @@ button.sidebar-submenu-item {
 
 .combustible-totals strong {
   font-variant-numeric: tabular-nums;
+}
+
+.nivel-reloj {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.nivel-reloj p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
 }
 
 .nivel-picker {

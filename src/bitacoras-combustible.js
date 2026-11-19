@@ -47,9 +47,18 @@ function opcionesVehiculo(selected) {
   return `<option value="">Selecciona un vehículo</option>${opciones.join('')}`;
 }
 
+function pintarReloj() {
+  const antes = nivelSeleccionado($('nivelAntes'));
+  const despues = nivelSeleccionado($('nivelDespues'));
+  $('relojNiveles').innerHTML = `
+    ${tanqueSvg(antes, 170, despues)}
+    <p>La raya negra es antes de cargar y la roja es después de cargar.</p>`;
+}
+
 function pintarNiveles(antes, despues) {
   $('nivelAntes').innerHTML = htmlSelectorNivel(antes || 'Vacio');
   $('nivelDespues').innerHTML = htmlSelectorNivel(despues || 'Vacio');
+  pintarReloj();
 }
 
 function bindNiveles(root) {
@@ -59,6 +68,7 @@ function bindNiveles(root) {
     const picker = btn.closest('.nivel-picker');
     picker.querySelectorAll('.nivel-option').forEach((item) => item.classList.remove('is-selected'));
     btn.classList.add('is-selected');
+    pintarReloj();
   });
 }
 
@@ -163,11 +173,9 @@ function abrirDetalle(row) {
     <p><strong>Km anterior:</strong> ${esc(row.km_anterior ?? '')}</p>
     <p><strong>Km actual:</strong> ${esc(row.km_actual ?? '')}</p>
     <p><strong>Observaciones:</strong> ${esc(row.observaciones)}</p>
-    <div class="nivel-picker">
-      <div>
-        ${tanqueSvg(row.nivel_antes_cargar, 150, row.nivel_despues_carga)}
-        <p>La línea negra marca el inicio y la roja la carga.</p>
-      </div>
+    <div class="nivel-reloj">
+      ${tanqueSvg(row.nivel_antes_cargar || 'Vacio', 180, row.nivel_despues_carga || 'Vacio')}
+      <p>La raya negra es antes de cargar y la roja es después de cargar.</p>
     </div>`;
   $('modalDetalleBitacora').classList.remove('hidden');
   $('btnEditarDesdeDetalleBitacora').onclick = () => {

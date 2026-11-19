@@ -191,6 +191,7 @@
                 <div class="records-search-wrapper">
                   <input type="text" id="searchInput" name="filtro-reportes" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="" class="field-input" role="searchbox">
                 </div>
+                <button type="button" class="btn btn-secondary admin-only" id="btnBusquedaAvanzada">Búsqueda avanzada</button>
                 <!-- Filtro de estatus: solo visible en vista reportes -->
                 <select id="filterEstatus" class="field-select records-status-select"
                   aria-label="Mostrar reportes por estatus">
@@ -203,6 +204,23 @@
                 <div class="stat-pill">Total: <strong id="lblTotal">0</strong></div>
                 <div class="stat-pill" id="pillLamparas">Lámparas: <strong id="lblLamparas">0</strong></div>
               </div>
+            </div>
+
+            <div id="panelBusquedaAvanzada" class="advanced-search-panel hidden noprint">
+              <p class="advanced-search-help">Pega el texto que te mandó el personal y el enlace de Maps. Se revisan todos los reportes, aunque no traigan el nombre ni el folio.</p>
+              <label class="field">
+                <span class="field-label">Descripción</span>
+                <textarea id="busquedaDescripcion" class="field-input" rows="3" data-keep-case="true" placeholder="Texto de lo que se hizo o de la ubicación"></textarea>
+              </label>
+              <label class="field">
+                <span class="field-label">Enlace de Maps</span>
+                <input type="text" id="busquedaMaps" class="field-input" data-keep-case="true" placeholder="https://maps.app.goo.gl/... o 20.391900, -101.191200" autocomplete="off" spellcheck="false">
+              </label>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="btnLimpiarBusquedaAvanzada">Quitar búsqueda</button>
+                <button type="button" class="btn btn-primary" id="btnAplicarBusquedaAvanzada">Buscar</button>
+              </div>
+              <p id="busquedaAvanzadaEstado" class="advanced-search-status"></p>
             </div>
 
             <!-- TABLA DE REPORTES (vista principal) -->

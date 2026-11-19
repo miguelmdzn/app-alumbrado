@@ -62,8 +62,6 @@ function modeloVehiculo(v) {
 
 function filaBitacora(row) {
   const grafico = tanqueSvg(row.nivel_antes_cargar || 'Vacio', 104, row.nivel_despues_carga || 'Vacio');
-  const antes = grafico;
-  const despues = grafico;
   return `<tr>
     <td>${esc(fechaDocumento(row.fecha_ticket))}</td>
     <td>${esc(row.numero_ticket)}</td>
@@ -72,8 +70,7 @@ function filaBitacora(row) {
     <td>${esc(formatoPesos(row.importe))}</td>
     <td>${row.km_anterior == null || row.km_anterior === '' ? '' : esc(row.km_anterior)}</td>
     <td>${row.km_actual == null || row.km_actual === '' ? '' : esc(row.km_actual)}</td>
-    <td class="tanque-celda">${antes}</td>
-    <td class="tanque-celda">${despues}</td>
+    <td class="tanque-celda" colspan="2">${grafico}</td>
   </tr>`;
 }
 
@@ -81,7 +78,7 @@ function hojaBitacora(vehiculo, filas) {
   const total = filas.reduce((acc, row) => acc + (Number(row.importe) || 0), 0);
   const vacias = Math.max(0, 4 - filas.length);
   const cuerpo = filas.map(filaBitacora).join('') + Array.from({ length: vacias }, () => `
-    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('');
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td colspan="2"></td></tr>`).join('');
   const responsable = vehiculo.responsable_bien || '';
   return `<section class="hoja">
     <h1 class="bit-muni">MUNICIPIO VALLE DE SANTIAGO, GTO.</h1>
@@ -114,8 +111,8 @@ function hojaBitacora(vehiculo, filas) {
           <th>IMPORTE</th>
           <th>KM ANTERIOR</th>
           <th>KM ACTUAL</th>
-          <th>NIVEL DEL TANQUE AL CARGAR</th>
-          <th>NIVEL DEL TANQUE AL FINAL DEL DIA</th>
+          <th>ANTES DE CARGAR</th>
+          <th>DESPUÉS DE CARGAR</th>
         </tr>
       </thead>
       <tbody>
@@ -262,34 +259,35 @@ function documentoHtml(cuerpo) {
 }
 
 function imprimirEnVisor(doc) {
-  let marco = document.getElementById('combustiblePrintFrame');
-  if (!marco) {
-    marco = document.createElement('iframe');
-    marco.id = 'combustiblePrintFrame';
-    marco.setAttribute('aria-hidden', 'true');
-    marco.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0;';
-    document.body.appendChild(marco);
-  }
-  const ventana = marco.contentWindow;
-  const documento = ventana.document;
-  documento.open();
-  documento.write(doc);
-  documento.close();
-  const tituloPrevio = document.title;
-  document.title = '';
-  setTimeout(() => {
-    ventana.focus();
-    ventana.print();
-    setTimeout(() => { document.title = tituloPrevio; }, 800);
-  }, 250);
+  return new Promise((resolve) => {
+    let marco = document.getElementById('combustiblePrintFrame');
+    if (!marco) {
+      marco = document.createElement('iframe');
+      marco.id = 'combustiblePrintFrame';
+      marco.setAttribute('aria-hidden', 'true');
+      marco.style.cssText = 'position:fixed;left:-1400px;top:0;width:1200px;height:900px;border:0;';
+      document.body.appendChild(marco);
+    }
+    const ventana = marco.contentWindow;
+    const documento = ventana.document;
+    documento.open();
+    documento.write(doc);
+    documento.close();
+    let cerrado = false;
+    const terminar = () => {
+      if (cerrado) return;
+      cerrado = true;
+      resolve();
+    };
+    ventana.addEventListener('afterprint', terminar, { once: true });
+    setTimeout(() => {
+      ventana.focus();
+      ventana.print();
+      setTimeout(terminar, 1200);
+    }, 300);
+  });
 }
 
 export function imprimirDocumento(_titulo, cuerpo) {
-  const doc = documentoHtml(cuerpo);
-  const invoke = window.__TAURI__?.core?.invoke;
-  if (typeof invoke !== 'function') {
-    imprimirEnVisor(doc);
-    return Promise.resolve();
-  }
-  return invoke('imprimir_pdf_limpio', { html: doc });
+  return imprimirEnVisor(documentoHtml(cuerpo));
 }

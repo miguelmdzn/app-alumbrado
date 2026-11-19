@@ -244,7 +244,7 @@ export async function getAtencionesParaImpresion() {
   if (isSQLiteReady()) {
     try {
       const result = await getSQLite().select(
-        `SELECT folio, numero, fecha_atencion, descripcion
+        `SELECT folio, numero, fecha_atencion, descripcion, latitud, longitud, enlace_maps
          FROM ${TABLE}
          ORDER BY numero ASC, fecha_atencion ASC;`
       );
@@ -267,6 +267,9 @@ export async function getAtencionesParaImpresion() {
       numero: Number(row.numero) || 1,
       fecha: row.fecha_atencion || row.fecha || '',
       descripcion: row.descripcion || '',
+      lat: row.latitud ?? row.lat ?? null,
+      lon: row.longitud ?? row.lon ?? null,
+      mapsUrl: row.enlace_maps || row.mapsUrl || '',
     });
   });
 

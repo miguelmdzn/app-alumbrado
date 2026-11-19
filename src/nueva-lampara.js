@@ -569,20 +569,13 @@ function initInstaladorMultiSelect() {
    Operaciones de Formulario (Guardar, Limpiar, Edición)
    -------------------------------------------------------------------------- */
 function resolveTipoLampara() {
-  const sel = $('tipoLampara') ? $('tipoLampara').value : 'LED';
-  if (sel !== 'Otro') return sel;
-  const espec = normalizeFinal($('otroTipo')?.value || '');
-  return espec ? `Otro(${espec})` : 'Otro';
+  return normalizeFinal($('tipoLampara')?.value || '');
 }
 
 function resetForm() {
   $('formLampara').reset();
   $('fecha').value = today();
   $('hora').value = nowTime();
-  if ($('tipoLampara')) $('tipoLampara').value = 'LED';
-  $('wrapOtroTipo')?.classList.add('hidden');
-  if ($('otroTipo')) $('otroTipo').value = '';
-
   selectedInstaladorIds = [];
   renderChips();
 
@@ -616,24 +609,9 @@ function fillForm(row) {
   $('alt').value = row.altitud || '';
   $('geoLink').value = row.enlace_maps || '';
 
-  // Tipo de lámpara
-  const rawTipo = String(row.tipo_lampara || 'LED').trim();
+  const rawTipo = String(row.tipo_lampara || '').trim();
   const mOtro = rawTipo.match(/^Otro\s*\((.*)\)\s*$/i);
-  if (mOtro) {
-    $('tipoLampara').value = 'Otro';
-    $('wrapOtroTipo')?.classList.remove('hidden');
-    $('otroTipo').value = mOtro[1].trim();
-  } else {
-    const match = [...$('tipoLampara').options].find((opt) => opt.value.toLowerCase() === rawTipo.toLowerCase());
-    $('tipoLampara').value = match ? match.value : 'Otro';
-    if (!match && rawTipo) {
-      $('wrapOtroTipo')?.classList.remove('hidden');
-      $('otroTipo').value = rawTipo;
-    } else {
-      $('wrapOtroTipo')?.classList.add('hidden');
-      $('otroTipo').value = '';
-    }
-  }
+  $('tipoLampara').value = mOtro ? mOtro[1].trim() : rawTipo;
 
   // Personal que la instaló
   selectedInstaladorIds = (row.personal_instalo || '')
@@ -682,6 +660,13 @@ $('formLampara').onsubmit = async (e) => {
     return;
   }
 
+  const tipoVal = resolveTipoLampara();
+  if (!tipoVal) {
+    showToast('error', 'Escribe el tipo de lámpara.');
+    $('tipoLampara')?.focus();
+    return;
+  }
+
   const geoText = $('geoLink').value.trim();
   const parsed = parseMapsInput(geoText);
 
@@ -716,7 +701,7 @@ $('formLampara').onsubmit = async (e) => {
     folio: normalizeFinal($('folio').value),
     fecha: fechaVal,
     hora: $('hora').value.trim() || nowTime(),
-    tipo_lampara: resolveTipoLampara(),
+    tipo_lampara: tipoVal,
     ubicacion: ubicacionVal,
     latitud: finalLat,
     longitud: finalLon,
@@ -751,16 +736,6 @@ $('formLampara').onsubmit = async (e) => {
 $('btnResetForm')?.addEventListener('click', resetForm);
 $('btnCancel')?.addEventListener('click', () => {
   window.location.href = 'lamparas-instaladas.html';
-});
-
-$('tipoLampara')?.addEventListener('change', () => {
-  if ($('tipoLampara').value === 'Otro') {
-    $('wrapOtroTipo')?.classList.remove('hidden');
-    $('otroTipo')?.focus();
-  } else {
-    $('wrapOtroTipo')?.classList.add('hidden');
-    if ($('otroTipo')) $('otroTipo').value = '';
-  }
 });
 
 // Eventos de geolocalización (botón "Calcular" e inputs)

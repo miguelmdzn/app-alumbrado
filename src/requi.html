@@ -6,7 +6,300 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>REQUI - Alumbrado Público</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="search-guard.js" defer></script>
   <script type="module" src="admin-mode.js"></script>
+  <script type="module" src="requi.js"></script>
+  <style>
+    .rq-screen {
+      max-width: 1080px;
+    }
+
+    .rq-card h2 {
+      margin: 18px 0 8px;
+      font-size: 14px;
+      color: var(--primary);
+    }
+
+    .rq-help {
+      margin: 0 0 12px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .rq-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .rq-grid .wide { grid-column: 1 / -1; }
+
+    .rq-card .field-input,
+    .rq-card textarea.field-input,
+    .rq-input {
+      font-size: 16px;
+      line-height: 1.45;
+      padding: 12px 14px;
+      min-height: 48px;
+    }
+
+    .rq-card textarea.field-input,
+    .rq-desc {
+      resize: vertical;
+      overflow: hidden;
+      white-space: pre-wrap;
+    }
+
+    .rq-edit {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+
+    .rq-edit th {
+      text-align: left;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 0 4px 4px;
+    }
+
+    .rq-edit td { padding: 6px 4px; vertical-align: top; }
+
+    .rq-desc { min-height: 72px; display: block; }
+
+    .rq-input {
+      width: 100%;
+      min-width: 0;
+      padding: 6px 8px;
+      border: 1px solid var(--border-line);
+      border-radius: 6px;
+      font: inherit;
+      font-size: 13px;
+    }
+
+    .rq-money, .rq-importe { text-align: right; font-variant-numeric: tabular-nums; }
+    .rq-importe { color: var(--text-main); font-weight: 700; white-space: nowrap; }
+
+    .rq-quitar {
+      border: 0;
+      background: transparent;
+      color: #b91c1c;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+
+    .rq-totals {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 12px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    .rq-totals strong { font-variant-numeric: tabular-nums; }
+
+    .rq-ajuste {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .rq-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .rq-aviso {
+      margin: 8px 0 0;
+      color: #9a3412;
+      font-size: 12.5px;
+    }
+
+    .rq-preview-note {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .rq-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100000;
+      overflow: auto;
+      padding: 24px 16px 48px;
+      background: rgba(15, 23, 42, 0.55);
+    }
+
+    .rq-modal-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      width: min(21.4cm, 100%);
+      margin: 0 auto 12px;
+    }
+
+    .rq-scale {
+      zoom: 0.78;
+      display: flex;
+      justify-content: center;
+    }
+
+    .rq-page {
+      width: 21.4cm;
+      height: 28cm;
+      flex: 0 0 auto;
+      position: relative;
+      background: #fff;
+      color: #111;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .rq-val {
+      position: absolute;
+      box-sizing: border-box;
+      overflow: hidden;
+      padding: 0 0.1cm;
+      color: #111;
+      font-weight: 700;
+      line-height: 1.15;
+      text-transform: uppercase;
+    }
+
+    /* Posición del texto dentro de cada cuadro del formato físico. */
+    .rq-proveedor { left: 1.05cm; top: 3.05cm; width: 9.9cm; height: 1.05cm; font-size: 11pt; display: flex; align-items: flex-end; }
+    .rq-direccion { left: 11.2cm; top: 2.9cm; width: 9cm; height: 0.4cm; font-size: 9pt; display: flex; align-items: flex-end; }
+    .rq-lugar { left: 11.2cm; top: 3.82cm; width: 5.05cm; height: 0.38cm; font-size: 9pt; display: flex; align-items: flex-end; }
+    .rq-fecha { left: 16.52cm; top: 4.15cm; width: 3.7cm; height: 0.95cm; font-size: 11pt; display: flex; align-items: center; justify-content: center; }
+    .rq-aut { left: 1.05cm; top: 4.7cm; width: 6.4cm; height: 0.42cm; font-size: 9pt; display: flex; align-items: flex-end; }
+    .rq-partida { left: 7.7cm; top: 4.7cm; width: 3.25cm; height: 0.42cm; font-size: 9pt; display: flex; align-items: flex-end; }
+    .rq-noprov { left: 11.2cm; top: 4.7cm; width: 5.05cm; height: 0.42cm; font-size: 9pt; display: flex; align-items: flex-end; }
+    .rq-partidas {
+      position: absolute;
+      left: 0;
+      top: 6.52cm;
+      width: 21.4cm;
+      height: 13.38cm;
+      overflow: hidden;
+    }
+    .rq-line {
+      display: grid;
+      grid-template-columns: 0.96cm 2.33cm 2.24cm 9.09cm 2.86cm 2.87cm 1.05cm;
+      min-height: 0.46cm;
+      font-size: 9pt;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .rq-line span { padding: 0.04cm 0.12cm 0; overflow: hidden; }
+    .rq-c, .rq-u { text-align: center; }
+    .rq-d { white-space: pre-wrap; word-break: break-word; }
+    .rq-pu, .rq-pt { text-align: right; font-variant-numeric: tabular-nums; }
+    .rq-objetivo { left: 1.08cm; top: 20.62cm; width: 13.35cm; height: 2.5cm; font-size: 9.5pt; white-space: pre-wrap; }
+    .rq-sub, .rq-iva {
+      left: 17.55cm;
+      width: 2.68cm;
+      height: 0.9cm;
+      font-size: 10pt;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      font-variant-numeric: tabular-nums;
+      padding-right: 0.12cm;
+    }
+    .rq-sub { top: 20.18cm; }
+    .rq-iva { top: 21.28cm; }
+    .rq-total {
+      left: 17.4cm;
+      top: 22.33cm;
+      width: 2.85cm;
+      height: 1.02cm;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      font-size: 6.5pt;
+      line-height: 1.05;
+      font-weight: 700;
+      text-transform: none;
+      padding-right: 0.06cm;
+    }
+    .rq-total-num { font-size: 8.5pt; line-height: 1.05; }
+    .rq-elaboro, .rq-autdep, .rq-adq {
+      top: 24.95cm;
+      height: 1.85cm;
+      font-size: 10pt;
+      text-align: center;
+      white-space: pre-wrap;
+    }
+    .rq-elaboro { left: 1.05cm; width: 6.15cm; }
+    .rq-autdep { left: 7.5cm; width: 6.15cm; }
+    .rq-adq { left: 14.05cm; width: 6.15cm; }
+
+    @media screen {
+      .rq-page {
+        background-image: url("requi-formato.jpg");
+        background-repeat: no-repeat;
+        background-size: 21.4cm 28cm;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+      }
+    }
+
+    @media (max-width: 980px) {
+      .rq-scale { zoom: 0.48; }
+    }
+
+    @media print {
+      @page { size: 21.4cm 28cm; margin: 0; }
+
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        width: 21.4cm !important;
+        height: 28cm !important;
+        overflow: hidden !important;
+      }
+
+      .app-shell,
+      .app-main-content,
+      .app-container {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 21.4cm !important;
+        min-height: 0 !important;
+        max-width: none !important;
+        box-shadow: none !important;
+        background: #fff !important;
+      }
+
+      .rq-modal,
+      .rq-modal.hidden {
+        display: block !important;
+        position: static !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        background: none !important;
+      }
+      .rq-screen { display: block !important; }
+      .rq-scale { zoom: 1 !important; display: block !important; }
+      .rq-page {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        background: none !important;
+        background-image: none !important;
+      }
+    }
+  </style>
 </head>
 
 <body>
@@ -61,10 +354,8 @@
           <span>Personal</span>
         </a>
 
-        <!-- Opción de primer nivel Lámparas LED -->
         <a href="lamparas-instaladas.html" class="sidebar-menu-item" id="navSidebarLamparas">
-          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="5"></circle>
             <line x1="12" y1="1" x2="12" y2="3"></line>
             <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -78,14 +369,13 @@
           <span>Lámparas LED</span>
         </a>
 
-                <a href="herramientas.html" class="sidebar-menu-item" id="navSidebarHerramientas">
+        <a href="herramientas.html" class="sidebar-menu-item" id="navSidebarHerramientas">
           <svg class="sidebar-menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
           </svg>
           <span>Herramientas</span>
         </a>
       </nav>
-      <!-- Footer del Sidebar: Google Sheets -->
       <div class="sidebar-footer">
         <a href="personal.html?openSheets=1" class="sidebar-footer-btn" id="btnSidebarGoogleSheets" title="Sincronización con Google Sheets">
           <svg class="sidebar-menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -101,30 +391,164 @@
     </aside>
 
     <div class="app-main-content">
-      <main class="app-container">
-        <header class="app-top-nav">
-          <div class="nav-title-group">
-            <h1 class="app-title">Requisiciones (REQUI)</h1>
-            <p class="app-desc">Control de requisiciones de material y equipo eléctrico.</p>
-          </div>
-        </header>
+      <main class="app-container app-container-fluid">
+        <div class="rq-screen">
+          <section class="records-container-card noprint rq-card" id="formRequi">
+            <h1 class="app-title" style="margin-bottom:6px;">Requisición de pago</h1>
+            <p class="rq-help">Llena los datos de la factura. Al imprimir solo sale el texto, para colocarlo sobre la hoja del formato (21.4 cm de ancho por 28 cm de alto). En la impresora usa escala 100% y desactiva encabezados y pies de página.</p>
 
-        <section class="records-container-card" style="padding: 40px 24px; text-align: center;">
-          <div style="max-width: 460px; margin: 0 auto;">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;">
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <path d="M16 10a4 4 0 0 1-8 0"></path>
-            </svg>
-            <h2 style="font-size: 18px; color: var(--primary); margin: 0 0 8px;">Módulo de Requisiciones (REQUI)</h2>
-            <p style="color: var(--text-muted); font-size: 13.5px; margin: 0 0 20px;">Esta herramienta estará disponible próximamente en las siguientes actualizaciones.</p>
-            <a href="dias-inhabiles.html" class="btn btn-secondary">Ir a Días Inhábiles</a>
-          </div>
-        </section>
+            <h2>Encabezado</h2>
+            <div class="rq-grid">
+              <label class="field">
+                <span class="field-label">Proveedor</span>
+                <input class="field-input" id="proveedor" type="text" autocomplete="off">
+              </label>
+              <label class="field">
+                <span class="field-label">Dirección / depto. solicitante</span>
+                <input class="field-input" id="direccion" type="text" autocomplete="off" placeholder="Alumbrado Público">
+              </label>
+              <label class="field">
+                <span class="field-label">Lugar de entrega</span>
+                <input class="field-input" id="lugar" type="text" autocomplete="off">
+              </label>
+              <label class="field">
+                <span class="field-label">Fecha</span>
+                <input class="field-input" id="fecha" type="date">
+              </label>
+              <label class="field">
+                <span class="field-label">Aut. presupuestal</span>
+                <input class="field-input" id="autPresupuestal" type="text" autocomplete="off">
+              </label>
+              <label class="field">
+                <span class="field-label">No. partida</span>
+                <input class="field-input" id="noPartida" type="text" autocomplete="off">
+              </label>
+              <label class="field wide">
+                <span class="field-label">No. prov. municipal</span>
+                <input class="field-input" id="noProv" type="text" autocomplete="off">
+              </label>
+            </div>
+
+            <h2>Partidas de la factura</h2>
+            <table class="rq-edit">
+              <thead>
+                <tr>
+                  <th style="width:78px;">Cantidad</th>
+                  <th style="width:72px;">Unidad</th>
+                  <th>Descripción</th>
+                  <th style="width:100px;">P. unitario</th>
+                  <th style="width:90px;">Importe</th>
+                  <th style="width:28px;"></th>
+                </tr>
+              </thead>
+              <tbody id="lineasBody"></tbody>
+            </table>
+            <p class="rq-aviso hidden" id="avisoPartidas">Hay tantas partidas que el texto ya no cabe en el cuadro de la descripción. Quita alguna o acorta el texto antes de imprimir.</p>
+            <button type="button" class="btn btn-secondary" id="btnAgregar" style="margin-top:8px;">Agregar partida</button>
+
+            <h2>Cierre</h2>
+            <label class="field">
+              <span class="field-label">Objetivo de la compra u observaciones</span>
+              <textarea class="field-input" id="objetivo" rows="4"></textarea>
+            </label>
+            <div class="rq-grid" style="margin-top:10px;">
+              <label class="field">
+                <span class="field-label">IVA % (se calcula solo)</span>
+                <input class="field-input" id="ivaTasa" type="text" data-keep-case="true" inputmode="decimal" value="16">
+              </label>
+              <label class="field">
+                <span class="field-label">IVA de la factura, si es distinto</span>
+                <input class="field-input" id="ivaManual" type="text" data-keep-case="true" inputmode="decimal" placeholder="Opcional">
+              </label>
+              <label class="field">
+                <span class="field-label">Total de la factura, si es distinto</span>
+                <input class="field-input" id="totalManual" type="text" data-keep-case="true" inputmode="decimal" placeholder="Opcional">
+              </label>
+              <label class="field">
+                <span class="field-label">Ret ISR</span>
+                <input class="field-input" id="retIsr" type="text" data-keep-case="true" inputmode="decimal" value="0.00">
+              </label>
+              <label class="field">
+                <span class="field-label">Red Cedular</span>
+                <input class="field-input" id="redCedular" type="text" data-keep-case="true" inputmode="decimal" value="0.00">
+              </label>
+            </div>
+            <div class="rq-totals">
+              <span>Subtotal</span><strong id="lblSubtotal">—</strong>
+              <span>IVA</span><strong id="lblIva">—</strong>
+              <span>Total</span><strong id="lblTotal">—</strong>
+              <span>Ret ISR</span><strong id="lblRetIsr">$0.00</strong>
+              <span>Red Cedular</span><strong id="lblRedCed">$0.00</strong>
+            </div>
+
+            <div class="rq-grid" style="margin-top:12px;">
+              <label class="field">
+                <span class="field-label">Elaboró</span>
+                <textarea class="field-input" id="elaboro" rows="3" placeholder="Nombre y puesto"></textarea>
+              </label>
+              <label class="field">
+                <span class="field-label">Autorizó departamento</span>
+                <textarea class="field-input" id="autorizoDep" rows="3" placeholder="Nombre y puesto"></textarea>
+              </label>
+              <label class="field wide">
+                <span class="field-label">Autorizó adquisiciones</span>
+                <textarea class="field-input" id="autorizoAdq" rows="3" placeholder="Nombre y puesto"></textarea>
+              </label>
+            </div>
+
+            <h2>Ajuste fino de impresión</h2>
+            <p class="rq-help">Si al probar una hoja el texto queda corrido, mueve estos milímetros. Derecha y abajo son números positivos.</p>
+            <div class="rq-ajuste">
+              <label class="field">
+                <span class="field-label">Horizontal (mm)</span>
+                <input class="field-input" id="ajusteX" type="number" step="0.5" value="0">
+              </label>
+              <label class="field">
+                <span class="field-label">Vertical (mm)</span>
+                <input class="field-input" id="ajusteY" type="number" step="0.5" value="0">
+              </label>
+            </div>
+
+            <div class="rq-actions">
+              <button type="button" class="btn btn-secondary" id="btnVista">Ver vista previa</button>
+              <button type="button" class="btn btn-primary" id="btnImprimir">Imprimir en el formato</button>
+              <button type="button" class="btn btn-secondary" id="btnLimpiar">Limpiar</button>
+            </div>
+          </section>
+        </div>
       </main>
+    </div>
+  </div>
+
+  <div id="modalVista" class="rq-modal hidden" role="dialog" aria-modal="true" aria-labelledby="tituloVista">
+    <div class="rq-modal-bar noprint">
+      <p class="rq-preview-note" id="tituloVista">Vista previa sobre el formato. Esa imagen no se imprime.</p>
+      <button type="button" class="btn btn-secondary" id="btnCerrarVista">Cerrar</button>
+    </div>
+    <div class="rq-scale">
+      <div class="rq-page" id="rqPage">
+        <div class="rq-val rq-proveedor" id="outProveedor"></div>
+        <div class="rq-val rq-direccion" id="outDireccion"></div>
+        <div class="rq-val rq-lugar" id="outLugar"></div>
+        <div class="rq-val rq-fecha" id="outFecha"></div>
+        <div class="rq-val rq-aut" id="outAut"></div>
+        <div class="rq-val rq-partida" id="outPartida"></div>
+        <div class="rq-val rq-noprov" id="outNoProv"></div>
+        <div class="rq-partidas" id="outPartidas"></div>
+        <div class="rq-val rq-objetivo" id="outObjetivo"></div>
+        <div class="rq-val rq-sub" id="outSubtotal"></div>
+        <div class="rq-val rq-iva" id="outIva"></div>
+        <div class="rq-val rq-total" id="outTotal">
+          <span id="outRetIsr"></span>
+          <span class="rq-total-num" id="outTotalNum"></span>
+          <span id="outRedCed"></span>
+        </div>
+        <div class="rq-val rq-elaboro" id="outElaboro"></div>
+        <div class="rq-val rq-autdep" id="outAutDep"></div>
+        <div class="rq-val rq-adq" id="outAdq"></div>
+      </div>
     </div>
   </div>
 </body>
 
 </html>
-

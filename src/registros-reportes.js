@@ -22,6 +22,8 @@ import {
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
+import { isAdmin, onAdminChange } from './admin-mode.js';
+import { buscarReportesProfundo } from './busqueda-reportes.js';
 import { processSyncQueue } from './database/repositories/syncQueue.js';
 import { TablePaginator } from './table-pagination.js';
 import { buildReporteEstadisticoHTML } from './reporte-estadistico.js';
@@ -49,6 +51,10 @@ let exportFolioSelected = new Set();
 /* Vista activa: 'reportes' | 'solicitudes' */
 let vistaActual = 'reportes';
 let allSolicitudes = [];
+let busquedaAvanzadaActiva = false;
+let ordenBusqueda = [];
+let notasBusqueda = new Map();
+let busquedaMensajeVacio = '';
 
 const paginator = new TablePaginator({
   containerId: 'tablePagination',
@@ -325,11 +331,13 @@ function renderTable(reportes) {
 
   if (pageData.length === 0) {
     const hasQuery = ($('searchInput')?.value || '').trim();
-    const emptyText = hasQuery
-      ? 'No se encontraron reportes con esa búsqueda.'
-      : filtro === 'atendido'
-        ? 'No se encontraron reportes atendidos.'
-        : 'No se encontraron reportes sin atender.';
+    const emptyText = busquedaAvanzadaActiva
+      ? (busquedaMensajeVacio || 'Ningún reporte coincide con esa búsqueda.')
+      : hasQuery
+        ? 'No se encontraron reportes con esa búsqueda.'
+        : filtro === 'atendido'
+          ? 'No se encontraron reportes atendidos.'
+          : 'No se encontraron reportes sin atender.';
     tbody.innerHTML = `
       <tr>
         <td colspan="12" class="table-empty-row">
@@ -351,6 +359,10 @@ function renderTable(reportes) {
       ? `<button type="button" class="btn-icon-action btn-icon-action-check" data-atender="${esc(r.id)}" title="Marcar como atendido" aria-label="Marcar como atendido">${CHECK_ICON}</button>`
       : '';
 
+    const nota = r._busquedaNota
+      ? `<tr class="busqueda-nota-row"><td colspan="7">${esc(r._busquedaNota)}</td></tr>`
+      : '';
+
     return `
       <tr>
         <td class="td-folio">${esc(r.folio || 'S/F')}</td>
@@ -369,6 +381,7 @@ function renderTable(reportes) {
           </div>
         </td>
       </tr>
+      ${nota}
     `;
   }).join('');
 
@@ -1089,11 +1102,20 @@ function applyFilterAndRender() {
   // Vista de reportes
   const filtro = $('filterEstatus')?.value || 'sin_atender';
 
-  let filtered = allReportes.filter((r) => {
-    const atendido = isAtendido(r.estatus);
-    if (filtro === 'atendido') return atendido;
-    return !atendido;
-  });
+  let filtered = allReportes;
+  if (busquedaAvanzadaActiva) {
+    const orden = new Map(ordenBusqueda.map((id, index) => [id, index]));
+    filtered = allReportes
+      .filter((r) => orden.has(r.id))
+      .map((r) => ({ ...r, _busquedaNota: notasBusqueda.get(r.id) || '' }));
+    filtered.sort((a, b) => orden.get(a.id) - orden.get(b.id));
+  } else {
+    filtered = allReportes.filter((r) => {
+      const atendido = isAtendido(r.estatus);
+      if (filtro === 'atendido') return atendido;
+      return !atendido;
+    });
+  }
 
   if (query) {
     filtered = filtered.filter((r) => {
@@ -1106,8 +1128,7 @@ function applyFilterAndRender() {
     });
   }
 
-  // Asegurar que la lista filtrada mantenga la jerarquía de estatus
-  sortReportesByHierarchy(filtered);
+  if (!busquedaAvanzadaActiva) sortReportesByHierarchy(filtered);
 
   paginator.resetPage();
   renderTable(filtered);
@@ -1232,6 +1253,95 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   $('searchInput')?.addEventListener('input', applyFilterAndRender);
   $('filterEstatus')?.addEventListener('change', applyFilterAndRender);
+
+  const limpiarBusquedaAvanzada = () => {
+    busquedaAvanzadaActiva = false;
+    ordenBusqueda = [];
+    notasBusqueda = new Map();
+    busquedaMensajeVacio = '';
+    if ($('busquedaAvanzadaEstado')) $('busquedaAvanzadaEstado').textContent = '';
+    applyFilterAndRender();
+  };
+
+  const mostrarReportes = () => {
+    if (vistaActual === 'reportes') return;
+    vistaActual = 'reportes';
+    $('vistaReportes')?.classList.remove('hidden');
+    $('vistaSolicitudes')?.classList.add('hidden');
+    if ($('filterEstatus')) $('filterEstatus').style.display = '';
+    if ($('pillLamparas')) $('pillLamparas').style.display = '';
+    if ($('lblToggleVista')) $('lblToggleVista').textContent = 'Solicitudes';
+    if ($('pageViewTitle')) $('pageViewTitle').textContent = 'REGISTRO DE REPORTES';
+  };
+
+  $('btnBusquedaAvanzada')?.addEventListener('click', () => {
+    if (!isAdmin()) return;
+    $('panelBusquedaAvanzada')?.classList.toggle('hidden');
+    if (!$('panelBusquedaAvanzada')?.classList.contains('hidden')) {
+      $('busquedaDescripcion')?.focus();
+    }
+  });
+
+  $('btnLimpiarBusquedaAvanzada')?.addEventListener('click', () => {
+    if ($('busquedaDescripcion')) $('busquedaDescripcion').value = '';
+    if ($('busquedaMaps')) $('busquedaMaps').value = '';
+    limpiarBusquedaAvanzada();
+  });
+
+  $('btnAplicarBusquedaAvanzada')?.addEventListener('click', async () => {
+    if (!isAdmin()) return;
+    const descripcion = $('busquedaDescripcion')?.value || '';
+    const enlace = $('busquedaMaps')?.value || '';
+    if (!descripcion.trim() && !enlace.trim()) {
+      if ($('busquedaAvanzadaEstado')) {
+        $('busquedaAvanzadaEstado').textContent = 'Escribe una descripción o pega un enlace de Maps.';
+      }
+      return;
+    }
+    const btn = $('btnAplicarBusquedaAvanzada');
+    if (btn) btn.disabled = true;
+    mostrarReportes();
+    busquedaAvanzadaActiva = true;
+    ordenBusqueda = [];
+    notasBusqueda = new Map();
+    busquedaMensajeVacio = 'Buscando en todos los reportes...';
+    if ($('busquedaAvanzadaEstado')) $('busquedaAvanzadaEstado').textContent = 'Buscando en todos los reportes...';
+    applyFilterAndRender();
+    try {
+      const resultado = await buscarReportesProfundo({
+        descripcion,
+        enlace,
+        reportes: allReportes,
+        atencionesPorFolio,
+        onStatus: (texto) => {
+          busquedaMensajeVacio = texto;
+          if ($('busquedaAvanzadaEstado')) $('busquedaAvanzadaEstado').textContent = texto;
+          if (!ordenBusqueda.length) applyFilterAndRender();
+        },
+      });
+      ordenBusqueda = resultado.ids;
+      notasBusqueda = resultado.notas;
+      busquedaMensajeVacio = resultado.vacio;
+      if ($('busquedaAvanzadaEstado')) $('busquedaAvanzadaEstado').textContent = resultado.mensaje;
+    } catch (err) {
+      console.error('[busqueda avanzada]', err);
+      ordenBusqueda = [];
+      busquedaMensajeVacio = 'No se pudo completar la búsqueda.';
+      if ($('busquedaAvanzadaEstado')) {
+        $('busquedaAvanzadaEstado').textContent = 'No se pudo completar la búsqueda. Revisa la conexión e inténtalo de nuevo.';
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+      applyFilterAndRender();
+    }
+  });
+
+  onAdminChange((activo) => {
+    if (!activo) {
+      $('panelBusquedaAvanzada')?.classList.add('hidden');
+      if (busquedaAvanzadaActiva) limpiarBusquedaAvanzada();
+    }
+  });
 
   $('modalAtendidoNo')?.addEventListener('click', closeAttendModal);
   $('modalAtendidoSi')?.addEventListener('click', onConfirmAtendidoSi);

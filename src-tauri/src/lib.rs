@@ -644,6 +644,114 @@ async fn send_gas_record(
     }
 }
 
+fn recorte_seguro(texto: &str, inicio: usize, largo: usize) -> String {
+    let fin = (inicio + largo).min(texto.len());
+    let mut end = fin;
+    while end > inicio && !texto.is_char_boundary(end) {
+        end -= 1;
+    }
+    let mut start = inicio.min(texto.len());
+    while start > 0 && !texto.is_char_boundary(start) {
+        start -= 1;
+    }
+    texto[start..end].to_string()
+}
+
+fn pista_coordenadas(texto: &str) -> String {
+    let recorte: String = texto.chars().take(150_000).collect();
+    if let Some(i) = recorte.find("!3d") {
+        return recorte_seguro(&recorte, i, 90);
+    }
+    if let Some(i) = recorte.find("@") {
+        let trozo = recorte_seguro(&recorte, i, 48);
+        let resto = trozo.trim_start_matches('@');
+        let parece = resto
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit() || c == '-')
+            .unwrap_or(false);
+        if parece {
+            return trozo;
+        }
+    }
+    String::new()
+}
+
+#[tauri::command]
+async fn resolver_enlace_maps(url: String) -> Result<serde_json::Value, String> {
+    let limpio = url.trim();
+    if !(limpio.starts_with("https://") || limpio.starts_with("http://")) {
+        return Err("El enlace no es válido.".to_string());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .redirect(reqwest::redirect::Policy::limited(12))
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+        .build()
+        .map_err(|e| format!("No se pudo abrir el enlace: {e}"))?;
+    let respuesta = client
+        .get(limpio)
+        .send()
+        .await
+        .map_err(|e| format!("No se pudo abrir el enlace de Maps: {e}"))?;
+    let final_url = respuesta.url().to_string();
+    let cuerpo = respuesta.text().await.unwrap_or_default();
+    Ok(serde_json::json!({
+        "url": final_url,
+        "pista": pista_coordenadas(&cuerpo),
+    }))
+}
+
+#[tauri::command]
+async fn consultar_lugar_maps(
+    consulta: String,
+    lat: Option<f64>,
+    lon: Option<f64>,
+) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .user_agent("AlumbradoPublicoValle/1.0 (registro municipal)")
+        .build()
+        .map_err(|e| format!("No se pudo consultar el mapa: {e}"))?;
+
+    let respuesta = if consulta.trim().is_empty() {
+        let lat = lat.ok_or_else(|| "Faltan coordenadas para consultar el mapa.".to_string())?;
+        let lon = lon.ok_or_else(|| "Faltan coordenadas para consultar el mapa.".to_string())?;
+        client
+            .get("https://nominatim.openstreetmap.org/reverse")
+            .query(&[
+                ("format", "jsonv2".to_string()),
+                ("addressdetails", "1".to_string()),
+                ("zoom", "18".to_string()),
+                ("lat", lat.to_string()),
+                ("lon", lon.to_string()),
+            ])
+            .send()
+            .await
+    } else {
+        client
+            .get("https://nominatim.openstreetmap.org/search")
+            .query(&[
+                ("format", "jsonv2".to_string()),
+                ("limit", "1".to_string()),
+                ("countrycodes", "mx".to_string()),
+                ("q", consulta.trim().to_string()),
+            ])
+            .send()
+            .await
+    }
+    .map_err(|e| format!("No se pudo consultar el mapa: {e}"))?;
+
+    if !respuesta.status().is_success() {
+        return Err("El mapa no respondió a la consulta.".to_string());
+    }
+    let texto = respuesta
+        .text()
+        .await
+        .map_err(|e| format!("No se pudo leer la respuesta del mapa: {e}"))?;
+    serde_json::from_str(&texto).map_err(|_| "El mapa no devolvió una ubicación.".to_string())
+}
+
 fn navegador_para_pdf() -> Result<PathBuf, String> {
     let candidatos = [
         r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
@@ -736,7 +844,9 @@ pub fn run() {
             combustible::combustible_editar_movimiento,
             combustible::combustible_eliminar_movimiento,
             combustible::combustible_eliminar_periodo,
-            imprimir_pdf_limpio
+            imprimir_pdf_limpio,
+            resolver_enlace_maps,
+            consultar_lugar_maps
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
