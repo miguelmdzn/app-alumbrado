@@ -61,7 +61,8 @@ function modeloVehiculo(v) {
 }
 
 function filaBitacora(row) {
-  const grafico = tanqueSvg(row.nivel_antes_cargar || 'Vacio', 104, row.nivel_despues_carga || 'Vacio');
+  const antes = tanqueSvg(row.nivel_antes_cargar || 'Vacio', 78, '#1a1a1a');
+  const despues = tanqueSvg(row.nivel_despues_carga || 'Vacio', 78, '#c62828');
   return `<tr>
     <td>${esc(fechaDocumento(row.fecha_ticket))}</td>
     <td>${esc(row.numero_ticket)}</td>
@@ -70,15 +71,16 @@ function filaBitacora(row) {
     <td>${esc(formatoPesos(row.importe))}</td>
     <td>${row.km_anterior == null || row.km_anterior === '' ? '' : esc(row.km_anterior)}</td>
     <td>${row.km_actual == null || row.km_actual === '' ? '' : esc(row.km_actual)}</td>
-    <td class="tanque-celda" colspan="2">${grafico}</td>
+    <td class="tanque-celda">${antes}</td>
+    <td class="tanque-celda">${despues}</td>
   </tr>`;
 }
 
-function hojaBitacora(vehiculo, filas) {
+function hojaBitacora(vehiculo, filas, elaboro) {
   const total = filas.reduce((acc, row) => acc + (Number(row.importe) || 0), 0);
   const vacias = Math.max(0, 4 - filas.length);
   const cuerpo = filas.map(filaBitacora).join('') + Array.from({ length: vacias }, () => `
-    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td colspan="2"></td></tr>`).join('');
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('');
   const responsable = vehiculo.responsable_bien || '';
   return `<section class="hoja">
     <h1 class="bit-muni">MUNICIPIO VALLE DE SANTIAGO, GTO.</h1>
@@ -128,7 +130,7 @@ function hojaBitacora(vehiculo, filas) {
     <div class="firmas">
       <div class="firma">
         <div class="firma-rol">ELABORÓ</div>
-        <div class="firma-nombre">LIC. EVELIN JOSELIN MÉNDEZ MIRANDA</div>
+        <div class="firma-nombre">${esc(elaboro || 'Miguel Angel Méndez Núñez')}</div>
         <div class="firma-linea"></div>
         <div class="firma-leyenda">Nombre y firma</div>
       </div>
@@ -148,14 +150,15 @@ function hojaBitacora(vehiculo, filas) {
   </section>`;
 }
 
-export function htmlBitacoras(filas) {
+export function htmlBitacoras(filas, elaboro) {
+  const nombre = String(elaboro || '').trim() || 'Miguel Angel Méndez Núñez';
   const grupos = new Map();
   filas.forEach((row) => {
     const clave = row.vehiculo_id || row.numero_serie;
     if (!grupos.has(clave)) grupos.set(clave, []);
     grupos.get(clave).push(row);
   });
-  return [...grupos.values()].map((rows) => hojaBitacora(rows[0], rows)).join('');
+  return [...grupos.values()].map((rows) => hojaBitacora(rows[0], rows, nombre)).join('');
 }
 
 function filasAjuste(items) {

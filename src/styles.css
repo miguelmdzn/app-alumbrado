@@ -3166,7 +3166,22 @@ button.sidebar-submenu-item {
   gap: 4px;
 }
 
-.nivel-reloj p {
+.nivel-relojes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.nivel-reloj-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.nivel-reloj p,
+.nivel-reloj-item p {
   margin: 0;
   font-size: 12px;
   font-weight: 700;

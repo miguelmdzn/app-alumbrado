@@ -124,21 +124,35 @@ export function etiquetaVehiculo(v) {
 
 function punto(t, radio) {
   const rad = Math.PI * (1 - t);
-  return [60 + Math.cos(rad) * radio, 58 - Math.sin(rad) * radio];
+  return [60 + Math.cos(rad) * radio, 62 - Math.sin(rad) * radio];
 }
 
 function nivelDe(nivelId) {
   return NIVELES.find((n) => n.id === nivelId) || NIVELES[0];
 }
 
-function aguja(t, radio, color, grosor) {
-  const [x2, y2] = punto(t, radio);
-  return `<line x1="60" y1="58" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${color}" stroke-width="${grosor}" stroke-linecap="round"/>`;
+function manosReloj(t, color) {
+  const rad = Math.PI * (1 - t);
+  const cx = 60;
+  const cy = 62;
+  const largo = (radio) => [
+    cx + Math.cos(rad) * radio,
+    cy - Math.sin(rad) * radio,
+  ];
+  const corto = (radio) => [
+    cx - Math.cos(rad) * radio,
+    cy + Math.sin(rad) * radio,
+  ];
+  const linea = (a, b, grosor) => {
+    const [x1, y1] = a;
+    const [x2, y2] = b;
+    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${color}" stroke-width="${grosor}" stroke-linecap="round"/>`;
+  };
+  return `${linea(largo(7), largo(34), 2.7)}${linea(corto(5), corto(15), 2.7)}`;
 }
 
-export function tanqueSvg(nivelId, px = 86, nivelCargaId = null) {
-  const inicio = nivelDe(nivelId);
-  const carga = nivelCargaId ? nivelDe(nivelCargaId) : null;
+export function tanqueSvg(nivelId, px = 86, color = '#1a1a1a') {
+  const nivel = nivelDe(nivelId);
   const marcas = [
     ['E', 0],
     ['1/4', 0.25],
@@ -156,17 +170,26 @@ export function tanqueSvg(nivelId, px = 86, nivelCargaId = null) {
     const fino = t === 1 / 3 || t === 2 / 3;
     return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x3.toFixed(1)}" y2="${y3.toFixed(1)}" stroke="#222" stroke-width="${fino ? 1 : 1.7}"/>`;
   }).join('');
-  const agujas = carga
-    ? `${aguja(inicio.t, 24, '#1a1a1a', 2.8)}${aguja(carga.t, 34, '#c62828', 1.8)}`
-    : aguja(inicio.t, 32, '#c62828', 2.2);
-  const etiqueta = carga ? `${inicio.label} y ${carga.label}` : inicio.label;
-  return `<svg class="tanque-svg" width="${px}" height="${Math.round(px * 0.72)}" viewBox="0 0 120 82" role="img" aria-label="${esc(etiqueta)}">
-    <path d="M 18 58 A 42 42 0 0 1 102 58" fill="none" stroke="#222" stroke-width="1.8"/>
+  return `<svg class="tanque-svg" width="${px}" height="${Math.round(px * 0.8)}" viewBox="0 0 120 96" role="img" aria-label="${esc(nivel.label)}">
+    <path d="M 18 62 A 42 42 0 0 1 102 62" fill="none" stroke="#222" stroke-width="1.8"/>
     ${ticks}
     ${textos}
-    ${agujas}
-    <circle cx="60" cy="58" r="3.1" fill="#222"/>
+    ${manosReloj(nivel.t, color)}
+    <circle cx="60" cy="62" r="3.2" fill="#222"/>
   </svg>`;
+}
+
+export function htmlRelojesNivel(antesId, despuesId, px = 150) {
+  return `<div class="nivel-relojes">
+    <div class="nivel-reloj-item">
+      ${tanqueSvg(antesId || 'Vacio', px, '#1a1a1a')}
+      <p>Antes de cargar</p>
+    </div>
+    <div class="nivel-reloj-item">
+      ${tanqueSvg(despuesId || 'Vacio', px, '#c62828')}
+      <p>Después de cargar</p>
+    </div>
+  </div>`;
 }
 
 export function htmlSelectorNivel(selected) {

@@ -19,7 +19,7 @@ import {
   nivelSeleccionado,
   mensajeError,
   semanaActual,
-  tanqueSvg,
+  htmlRelojesNivel,
   partesFecha,
 } from './combustible/formato.js';
 import { htmlBitacoras, imprimirDocumento } from './combustible/print.js';
@@ -50,9 +50,7 @@ function opcionesVehiculo(selected) {
 function pintarReloj() {
   const antes = nivelSeleccionado($('nivelAntes'));
   const despues = nivelSeleccionado($('nivelDespues'));
-  $('relojNiveles').innerHTML = `
-    ${tanqueSvg(antes, 170, despues)}
-    <p>La raya negra es antes de cargar y la roja es después de cargar.</p>`;
+  $('relojNiveles').innerHTML = htmlRelojesNivel(antes, despues, 150);
 }
 
 function pintarNiveles(antes, despues) {
@@ -174,8 +172,7 @@ function abrirDetalle(row) {
     <p><strong>Km actual:</strong> ${esc(row.km_actual ?? '')}</p>
     <p><strong>Observaciones:</strong> ${esc(row.observaciones)}</p>
     <div class="nivel-reloj">
-      ${tanqueSvg(row.nivel_antes_cargar || 'Vacio', 180, row.nivel_despues_carga || 'Vacio')}
-      <p>La raya negra es antes de cargar y la roja es después de cargar.</p>
+      ${htmlRelojesNivel(row.nivel_antes_cargar, row.nivel_despues_carga, 160)}
     </div>`;
   $('modalDetalleBitacora').classList.remove('hidden');
   $('btnEditarDesdeDetalleBitacora').onclick = () => {
@@ -205,9 +202,12 @@ const refreshAdminDelete = bindAdminDelete({
 $('btnNuevaBitacora').addEventListener('click', () => abrirFormulario(null));
 $('btnCancelarBitacora').addEventListener('click', cerrarFormulario);
 $('buscarBitacora').addEventListener('input', aplicarFiltro);
+const ELABORO_DEFAULT = 'Miguel Angel Méndez Núñez';
+
 $('btnPdfBitacoras').addEventListener('click', () => {
   $('pdfDesde').value = '';
   $('pdfHasta').value = '';
+  if ($('pdfElaboro') && !$('pdfElaboro').value.trim()) $('pdfElaboro').value = ELABORO_DEFAULT;
   $('modalPdfBitacora').classList.remove('hidden');
 });
 $('btnCancelarPdf').addEventListener('click', () => $('modalPdfBitacora').classList.add('hidden'));
@@ -225,9 +225,10 @@ $('formPdfBitacora').addEventListener('submit', (event) => {
     showToast('error', 'No hay registros en esas fechas.');
     return;
   }
+  const elaboro = $('pdfElaboro')?.value.trim() || ELABORO_DEFAULT;
   $('modalPdfBitacora').classList.add('hidden');
   showToast('success', 'Generando el documento...');
-  imprimirDocumento('Bitácora de gasolina', htmlBitacoras(seleccion)).catch((err) => {
+  imprimirDocumento('Bitácora de gasolina', htmlBitacoras(seleccion, elaboro)).catch((err) => {
     showToast('error', mensajeError(err));
   });
 });
