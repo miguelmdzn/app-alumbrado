@@ -17,6 +17,7 @@ import {
   idbClear,
   generateUUID,
 } from '../core.js';
+import { queryPage, likeParam, sqlLike } from '../page.js';
 
 const TABLE = 'personal';
 
@@ -167,5 +168,64 @@ export async function deletePersonal(id) {
 
   await idbDelete(TABLE, id);
   return true;
+}
+
+const CAMPOS_PERSONAL = ['nombres', 'apellido1', 'apellido2', 'cargo', 'numero_trabajador', 'numero_checador_digital'];
+
+function personalWhere(estatus, texto) {
+  const like = texto ? likeParam(texto) : '';
+  const params = [
+    estatus || 'Activo',
+    like ? '1' : '',
+    ...CAMPOS_PERSONAL.map(() => like || '%'),
+  ];
+  const where = `(
+      $1 = 'todos' OR IFNULL(estatus, 'Activo') = $1
+    ) AND (
+      $2 = '' OR ${sqlLike(CAMPOS_PERSONAL, 3)}
+      OR LOWER(IFNULL(nombres, '') || ' ' || IFNULL(apellido1, '') || ' ' || IFNULL(apellido2, '')) LIKE $3
+    )`;
+  return { where, params };
+}
+
+export async function listPersonalPage({ estatus = 'Activo', texto = '', limit = 10, offset = 0 } = {}) {
+  const filtro = personalWhere(estatus, texto);
+  const q = texto.trim().toLowerCase();
+  return queryPage({
+    fromSql: TABLE,
+    whereSql: filtro.where,
+    params: filtro.params,
+    orderSql: `CASE WHEN IFNULL(estatus, 'Activo') = 'Activo' THEN 0 ELSE 1 END, nombres COLLATE NOCASE, apellido1 COLLATE NOCASE`,
+    limit,
+    offset,
+    extraSql: `SUM(CASE WHEN IFNULL(estatus, 'Activo') = 'Activo' THEN 1 ELSE 0 END) AS activos`,
+    idbAll: () => idbGetAll(TABLE),
+    idbFilter: (p) => {
+      const est = p.estatus || 'Activo';
+      if (estatus !== 'todos' && est !== estatus) return false;
+      if (!q) return true;
+      const full = [p.nombres, p.apellido1, p.apellido2].filter(Boolean).join(' ').toLowerCase();
+      return full.includes(q)
+        || String(p.cargo || '').toLowerCase().includes(q)
+        || String(p.numero_trabajador || '').toLowerCase().includes(q)
+        || String(p.numero_checador_digital || '').toLowerCase().includes(q);
+    },
+    idbCompare: (a, b) => {
+      const ea = (a.estatus || 'Activo') === 'Activo' ? 0 : 1;
+      const eb = (b.estatus || 'Activo') === 'Activo' ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      return String(a.nombres || '').localeCompare(String(b.nombres || ''), 'es');
+    },
+    idbStats: (list) => ({
+      activos: list.filter((p) => (p.estatus || 'Activo') === 'Activo').length,
+    }),
+  });
+}
+
+export async function resumenPersonal() {
+  const page = await listPersonalPage({ estatus: 'todos', texto: '', limit: 1, offset: 0 });
+  const total = Number(page.total || 0);
+  const activos = Number(page.stats?.activos || 0);
+  return { total, activos, inactivos: Math.max(0, total - activos) };
 }
 

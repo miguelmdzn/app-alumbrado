@@ -59,18 +59,17 @@ function ensureModals() {
   const wrap = document.createElement('div');
   wrap.innerHTML = `
     <div id="adminGate" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adminGateTitle">
-      <div class="modal-card" style="max-width: 420px;">
+      <div class="modal-card admin-gate-card">
+        <button type="button" class="admin-gate-close" id="adminGateCancel" aria-label="Cerrar">&times;</button>
         <h2 class="modal-title" id="adminGateTitle">Inserta la contraseña</h2>
         <p class="modal-text" id="adminGateText">El modo administrador permite borrar registros de forma permanente.</p>
-        <label class="field" id="adminGateField">
-          <span class="field-label">Contraseña</span>
-          <input type="password" id="adminPasswordInput" class="field-input" autocomplete="off" spellcheck="false" data-keep-case="true">
-        </label>
-        <p class="modal-text hidden" id="adminGateError" style="color:#b91c1c;margin-top:8px;">Contraseña incorrecta.</p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="adminGateCancel">Cancelar</button>
-          <button type="button" class="btn btn-primary" id="adminGateOk">Entrar</button>
+        <div class="admin-pass-form" id="adminPassForm">
+          <label class="admin-pass-field" id="adminGateField">
+            <input type="password" id="adminPasswordInput" class="admin-pass-input" placeholder="Contraseña" aria-label="Contraseña" autocomplete="off" spellcheck="false" data-keep-case="true">
+          </label>
+          <button type="button" class="admin-pass-submit" id="adminGateOk">Entrar</button>
         </div>
+        <p class="modal-text hidden" id="adminGateError" style="color:#b91c1c;margin-top:8px;">Contraseña incorrecta.</p>
       </div>
     </div>
     <div id="adminConfirm" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adminConfirmTitle">
@@ -90,6 +89,7 @@ function ensureModals() {
   const input = document.getElementById('adminPasswordInput');
   const error = document.getElementById('adminGateError');
   const field = document.getElementById('adminGateField');
+  const form = document.getElementById('adminPassForm');
   const text = document.getElementById('adminGateText');
   const title = document.getElementById('adminGateTitle');
   const ok = document.getElementById('adminGateOk');
@@ -107,11 +107,13 @@ function ensureModals() {
       title.textContent = 'Modo administrador';
       text.textContent = 'Ya estás en modo administrador. ¿Deseas salir?';
       field.classList.add('hidden');
+      form.classList.add('is-exit');
       ok.textContent = 'Salir';
     } else {
       title.textContent = 'Inserta la contraseña';
       text.textContent = 'El modo administrador permite borrar registros de forma permanente.';
       field.classList.remove('hidden');
+      form.classList.remove('is-exit');
       ok.textContent = 'Entrar';
     }
     gate.classList.remove('hidden');

@@ -5,6 +5,8 @@ import {
   formatoPesos,
   formatoLitros,
   fechaDocumento,
+  fechaBitacora,
+  compararCargaReciente,
   tituloSemana,
   tanqueSvg,
 } from './formato.js';
@@ -64,7 +66,7 @@ function filaBitacora(row) {
   const antes = tanqueSvg(row.nivel_antes_cargar || 'Vacio', 78, '#1a1a1a');
   const despues = tanqueSvg(row.nivel_despues_carga || 'Vacio', 78, '#c62828');
   return `<tr>
-    <td>${esc(fechaDocumento(row.fecha_ticket))}</td>
+    <td>${esc(fechaBitacora(row.fecha_ticket))}</td>
     <td>${esc(row.numero_ticket)}</td>
     <td class="bit-lugar">${esc(row.lugar_comision)}</td>
     <td>${esc(formatoLitros(row.litros))}</td>
@@ -158,7 +160,10 @@ export function htmlBitacoras(filas, elaboro) {
     if (!grupos.has(clave)) grupos.set(clave, []);
     grupos.get(clave).push(row);
   });
-  return [...grupos.values()].map((rows) => hojaBitacora(rows[0], rows, nombre)).join('');
+  return [...grupos.values()].map((rows) => {
+    const ordenadas = [...rows].sort(compararCargaReciente);
+    return hojaBitacora(ordenadas[0], ordenadas, nombre);
+  }).join('');
 }
 
 function filasAjuste(items) {

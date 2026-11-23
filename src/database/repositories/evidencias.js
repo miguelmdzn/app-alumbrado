@@ -20,6 +20,7 @@ import {
   idbClear,
   generateUUID
 } from '../core.js';
+import { queryPage, queryMatching, likeParam, sqlLike } from '../page.js';
 
 import {
   loadEvidenceFile,
@@ -278,4 +279,48 @@ export async function clearAllEvidencias() {
     }
   }
   await idbClear(TABLE);
+}
+
+const CAMPOS_EVIDENCIA = ['folio', 'tipo_reporte', 'ubicacion', 'solicitante', 'personal_atendio'];
+
+function specEvidencia(texto = '') {
+  const like = texto.trim() ? likeParam(texto) : '';
+  const q = texto.trim().toLowerCase();
+  return {
+    fromSql: TABLE,
+    whereSql: `($1 = '' OR ${sqlLike(CAMPOS_EVIDENCIA, 2)})`,
+    params: [like ? '1' : '', ...CAMPOS_EVIDENCIA.map(() => like || '%')],
+    orderSql: 'fecha_atencion ASC, hora_atencion ASC, created_at ASC',
+    extraSql: `SUM(CASE WHEN lower(IFNULL(estatus, '')) = 'atendido' THEN 1 ELSE 0 END) AS atendidos`,
+    idbAll: () => idbGetAll(TABLE),
+    idbFilter: (r) => {
+      if (!q) return true;
+      return CAMPOS_EVIDENCIA.some((campo) => String(r[campo] || '').toLowerCase().includes(q));
+    },
+    idbCompare: (a, b) => String((a.fecha_atencion || '') + (a.hora_atencion || '')).localeCompare(String((b.fecha_atencion || '') + (b.hora_atencion || ''))),
+    idbStats: (list) => ({
+      atendidos: list.filter((r) => String(r.estatus || '').toLowerCase() === 'atendido').length,
+    }),
+  };
+}
+
+async function conFotos(rows) {
+  const items = rows.map(toFrontend);
+  for (const item of items) {
+    item.fotos = [
+      item.fotoRefs[0] ? await loadEvidenceFile(item.fotoRefs[0]) : null,
+      item.fotoRefs[1] ? await loadEvidenceFile(item.fotoRefs[1]) : null,
+    ];
+  }
+  return items;
+}
+
+export async function listEvidenciasPage({ texto = '', limit = 10, offset = 0 } = {}) {
+  const page = await queryPage({ ...specEvidencia(texto), limit, offset });
+  return { ...page, rows: page.rows.map(toFrontend) };
+}
+
+export async function listEvidenciasMatching(texto = '') {
+  const rows = await queryMatching(specEvidencia(texto));
+  return conFotos(rows);
 }

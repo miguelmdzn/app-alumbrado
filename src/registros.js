@@ -11,8 +11,10 @@
 
 import {
   initDatabase,
-  getAllEvidencias,
+  getEvidenciaById,
   deleteEvidencia,
+  listEvidenciasPage,
+  listEvidenciasMatching,
   loadMetadatos,
   openEvidenciasFolder,
   getAllPersonal,
@@ -70,7 +72,7 @@ let metadata = {
 
 const paginator = new TablePaginator({
   containerId: 'tablePagination',
-  onPageChange: () => renderTable(lastFilteredRecords),
+  onPageChange: () => { cargarEvidencias(); },
   storageKey: 'paginator_evidencias',
 });
 
@@ -115,12 +117,19 @@ function generateQrDataUrl(targetUrl) {
 /* --------------------------------------------------------------------------
    VISTA DE PANTALLA: RENDERIZADO DE LA TABLA DE REGISTROS
    -------------------------------------------------------------------------- */
-function renderTable(records) {
+function renderTable(records, meta = {}) {
   const tbody = $('recordsTableBody');
   if (!tbody) return;
 
   lastFilteredRecords = records;
-  const pageData = paginator.getCurrentSlice(records);
+  const pageData = meta.paged ? records : paginator.getCurrentSlice(records);
+  const totalLista = meta.paged ? meta.total : records.length;
+  if (meta.paged) {
+    const atendidos = Number(meta.atendidos || 0);
+    if ($('lblTotal')) $('lblTotal').textContent = totalLista;
+    if ($('lblAtendidos')) $('lblAtendidos').textContent = atendidos;
+    if ($('lblPendientes')) $('lblPendientes').textContent = Math.max(0, totalLista - atendidos);
+  }
 
   if (pageData.length === 0) {
     tbody.innerHTML = `
@@ -130,7 +139,7 @@ function renderTable(records) {
         </td>
       </tr>
     `;
-    paginator.update(records.length);
+    paginator.update(totalLista);
     return;
   }
 
@@ -195,7 +204,7 @@ function renderTable(records) {
     btn.onclick = () => openEliminarEvidenciaModal(btn.dataset.del);
   });
 
-  paginator.update(records.length);
+  paginator.update(totalLista);
 }
 
 /* --------------------------------------------------------------------------
@@ -203,8 +212,14 @@ function renderTable(records) {
    -------------------------------------------------------------------------- */
 let pendingDeleteEvidenciaId = null;
 
-function openDetalleEvidenciaModal(id) {
-  const r = allRecords.find((x) => x.id === id);
+async function openDetalleEvidenciaModal(id) {
+  let r = lastFilteredRecords.find((x) => x.id === id);
+  try {
+    const completo = await getEvidenciaById(id);
+    if (completo) r = completo;
+  } catch (err) {
+    console.warn('No se pudo abrir el detalle:', err);
+  }
   if (!r) return;
 
   const content = $('modalDetalleEvidenciaContent');
@@ -290,7 +305,7 @@ function closeDetalleEvidenciaModal() {
 
 function openEliminarEvidenciaModal(id) {
   pendingDeleteEvidenciaId = id;
-  const r = allRecords.find((x) => x.id === id);
+  const r = lastFilteredRecords.find((x) => x.id === id);
   const folio = r?.folio || 'este reporte';
   if ($('modalEliminarEvidenciaTexto')) {
     $('modalEliminarEvidenciaTexto').textContent = `¿Estás seguro de que deseas eliminar la evidencia del folio "${folio}"?`;
@@ -309,7 +324,6 @@ async function confirmEliminarEvidencia() {
   if (!id) return;
   try {
     await deleteEvidencia(id);
-    allRecords = allRecords.filter((x) => x.id !== id);
     applyFilterAndRender();
   } catch (err) {
     console.error('Error al eliminar evidencia:', err);
@@ -475,25 +489,29 @@ function renderPrintBitacora(records) {
 /* --------------------------------------------------------------------------
    Filtros y Búsqueda
    -------------------------------------------------------------------------- */
-function applyFilterAndRender() {
-  const query = ($('searchInput')?.value || '').trim().toLowerCase();
+let cargaEvidencias = 0;
 
-  let filtered = [...allRecords];
-  if (query) {
-    filtered = filtered.filter((r) => {
-      const folio = (r.folio || '').toLowerCase();
-      const tipo = (r.tipo || '').toLowerCase();
-      const ubicacion = (r.ubicacion || '').toLowerCase();
-      const solicita = (r.solicita || '').toLowerCase();
-      const atendioRaw = (r.atendio || '').toLowerCase();
-      const atendioNom = formatAtendioDisplay(r.atendio).toLowerCase();
-      return folio.includes(query) || tipo.includes(query) || ubicacion.includes(query) || solicita.includes(query) || atendioRaw.includes(query) || atendioNom.includes(query);
+async function cargarEvidencias({ reset = false } = {}) {
+  if (reset) paginator.resetPage();
+  const token = ++cargaEvidencias;
+  const limit = paginator.getRowsPerPage();
+  const offset = (paginator.currentPage - 1) * limit;
+  const texto = ($('searchInput')?.value || '').trim();
+  try {
+    const page = await listEvidenciasPage({ texto, limit, offset });
+    if (token !== cargaEvidencias) return;
+    renderTable(page.rows, {
+      paged: true,
+      total: page.total,
+      atendidos: Number(page.stats?.atendidos || 0),
     });
+  } catch (err) {
+    console.error('Error al consultar evidencias:', err);
   }
+}
 
-  paginator.resetPage();
-  renderTable(filtered);
-  renderPrintBitacora(filtered);
+function applyFilterAndRender() {
+  cargarEvidencias({ reset: true });
 }
 
 /* --------------------------------------------------------------------------
@@ -521,29 +539,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     personalMap = new Map();
   }
 
-  // Cargar todas las evidencias desde SQLite (con fotos desde el disco)
-  try {
-    allRecords = await getAllEvidencias();
-  } catch (err) {
-    console.error('Error al consultar evidencias:', err);
-    allRecords = [];
-  }
-
-  // Ordenar cronológicamente
-  allRecords.sort((a, b) => {
-    const kA = (a.fecha || '') + (a.hora || '99:99');
-    const kB = (b.fecha || '') + (b.hora || '99:99');
-    return kA.localeCompare(kB);
-  });
-
-  applyFilterAndRender();
+  await cargarEvidencias();
   attachInputNormalizers(document);
 
   // Búsqueda en vivo
   $('searchInput')?.addEventListener('input', applyFilterAndRender);
 
   // Botón: Exportar / Imprimir PDF (el formato oficial no cambia)
-  $('btnExportPdf')?.addEventListener('click', () => {
+  $('btnExportPdf')?.addEventListener('click', async () => {
+    const texto = ($('searchInput')?.value || '').trim();
+    const lista = await listEvidenciasMatching(texto);
+    renderPrintBitacora(lista);
     window.print();
   });
 

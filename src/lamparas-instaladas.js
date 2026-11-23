@@ -13,8 +13,8 @@
 
 import {
   initDatabase,
-  getAllLamparasInstaladas,
   deleteLamparaInstalada,
+  listLamparasPage,
   getAllPersonal,
   getFullName,
 } from './db.js';
@@ -69,7 +69,7 @@ let toastTimeout = null;
    -------------------------------------------------------------------------- */
 const paginator = new TablePaginator({
   containerId: 'tablePagination',
-  onPageChange: () => renderTable(lastFiltered),
+  onPageChange: () => { cargarLamparas(); },
   storageKey: 'paginator_lamparas_instaladas',
 });
 
@@ -106,16 +106,17 @@ function resolvePersonalDisplay(rawTokens) {
 /* --------------------------------------------------------------------------
    Renderizado de Tabla
    -------------------------------------------------------------------------- */
-function renderTable(records) {
+function renderTable(records, meta = {}) {
   const tbody = $('lamparasTableBody');
   if (!tbody) return;
 
   lastFiltered = records;
-  const pageData = paginator.getCurrentSlice(records);
+  const pageData = meta.paged ? records : paginator.getCurrentSlice(records);
+  const totalLista = meta.paged ? meta.total : records.length;
 
   if (pageData.length === 0) {
     tbody.innerHTML = `<tr><td colspan="10" class="table-empty-row">No se encontraron registros de lámparas instaladas.</td></tr>`;
-    paginator.update(records.length);
+    paginator.update(totalLista);
     return;
   }
 
@@ -184,28 +185,37 @@ function renderTable(records) {
     btn.onclick = () => openDeleteConfirm(btn.dataset.del);
   });
 
-  paginator.update(records.length);
+  paginator.update(totalLista);
 }
 
 /* --------------------------------------------------------------------------
    Filtro y Búsqueda
    -------------------------------------------------------------------------- */
-function applyFilter() {
-  const q = ($('searchInput')?.value || '').trim().toLowerCase();
-  let filtered = [...allRecords];
-  if (q) {
-    filtered = filtered.filter((r) => {
-      const folio = (r.folio || '').toLowerCase();
-      const tipo = (r.tipo_lampara || '').toLowerCase();
-      const ubi = (r.ubicacion || '').toLowerCase();
-      const persRaw = (r.personal_instalo || '').toLowerCase();
-      const persNom = resolvePersonalDisplay(r.personal_instalo).toLowerCase();
-      return folio.includes(q) || tipo.includes(q) || ubi.includes(q) || persRaw.includes(q) || persNom.includes(q);
-    });
+let cargaLamparas = 0;
+
+async function cargarLamparas({ reset = false } = {}) {
+  if (reset) paginator.resetPage();
+  const token = ++cargaLamparas;
+  const limit = paginator.getRowsPerPage();
+  const offset = (paginator.currentPage - 1) * limit;
+  const texto = ($('searchInput')?.value || '').trim();
+  const q = texto.toLowerCase();
+  const idsPersonal = q
+    ? allPersonal.filter((p) => (getFullName(p) || '').toLowerCase().includes(q)).map((p) => p.id)
+    : [];
+  try {
+    const page = await listLamparasPage({ texto, idsPersonal, limit, offset });
+    if (token !== cargaLamparas) return;
+    allRecords = page.rows;
+    renderTable(page.rows, { paged: true, total: page.total });
+    if ($('lblTotalLamparas')) $('lblTotalLamparas').textContent = page.total;
+  } catch (err) {
+    console.error(err);
   }
-  paginator.resetPage();
-  renderTable(filtered);
-  if ($('lblTotalLamparas')) $('lblTotalLamparas').textContent = filtered.length;
+}
+
+function applyFilter() {
+  cargarLamparas({ reset: true });
 }
 
 /* --------------------------------------------------------------------------
@@ -304,16 +314,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     allPersonal = [];
   }
 
-  // Cargar lámparas instaladas
   try {
-    allRecords = await getAllLamparasInstaladas();
+    await cargarLamparas();
   } catch (err) {
     console.error('Error al cargar lámparas instaladas:', err);
     allRecords = [];
   }
 
   attachInputNormalizers(document);
-  applyFilter();
 
   // Búsqueda en vivo
   $('searchInput')?.addEventListener('input', applyFilter);

@@ -15,6 +15,7 @@ import {
   idbDelete,
   generateUUID,
 } from '../core.js';
+import { queryPage, likeParam, sqlLike } from '../page.js';
 
 const TABLE = 'localidades';
 
@@ -199,5 +200,25 @@ export async function findOrCreateLocalidad(nombre, tipo) {
 
   // 3. No existe → insertar
   return saveLocalidad({ nombre: n, tipo: t });
+}
+
+export async function listLocalidadesPage({ tipo = '', texto = '', limit = 10, offset = 0 } = {}) {
+  const like = texto.trim() ? likeParam(texto) : '';
+  const q = texto.trim().toLowerCase();
+  return queryPage({
+    fromSql: TABLE,
+    whereSql: `($1 = '' OR tipo = $1) AND ($2 = '' OR ${sqlLike(['nombre', 'tipo'], 3)})`,
+    params: [tipo || '', like ? '1' : '', like || '%', like || '%'],
+    orderSql: 'tipo ASC, nombre ASC',
+    limit,
+    offset,
+    idbAll: () => idbGetAll(TABLE),
+    idbFilter: (r) => {
+      if (tipo && r.tipo !== tipo) return false;
+      if (!q) return true;
+      return String(r.nombre || '').toLowerCase().includes(q) || String(r.tipo || '').toLowerCase().includes(q);
+    },
+    idbCompare: (a, b) => String(a.tipo || '').localeCompare(String(b.tipo || '')) || String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'),
+  });
 }
 

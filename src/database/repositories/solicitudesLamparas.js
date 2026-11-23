@@ -16,6 +16,7 @@ import {
   idbClear,
   generateUUID,
 } from '../core.js';
+import { queryPage, likeParam, sqlLike } from '../page.js';
 
 import { findOrCreateLocalidad } from './localidades.js';
 
@@ -163,4 +164,22 @@ export async function deleteSolicitudLampara(id) {
 
   await idbDelete(TABLE, id);
   return true;
+}
+
+const CAMPOS_SOLICITUD = ['nombre_solicitante', 'tipo_localidad', 'descripcion', 'observaciones', 'estatus'];
+
+export async function listSolicitudesPage({ texto = '', limit = 10, offset = 0 } = {}) {
+  const like = texto.trim() ? likeParam(texto) : '';
+  const q = texto.trim().toLowerCase();
+  return queryPage({
+    fromSql: TABLE,
+    whereSql: `($1 = '' OR ${sqlLike(CAMPOS_SOLICITUD, 2)})`,
+    params: [like ? '1' : '', ...CAMPOS_SOLICITUD.map(() => like || '%')],
+    orderSql: 'fecha_solicitud DESC, created_at DESC',
+    limit,
+    offset,
+    idbAll: () => idbGetAll(TABLE),
+    idbFilter: (s) => !q || CAMPOS_SOLICITUD.some((campo) => String(s[campo] || '').toLowerCase().includes(q)),
+    idbCompare: (a, b) => String((b.fecha_solicitud || '') + (b.created_at || '')).localeCompare(String((a.fecha_solicitud || '') + (a.created_at || ''))),
+  });
 }

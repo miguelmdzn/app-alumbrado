@@ -82,8 +82,8 @@ body {
 }
 
 .sidebar-brand-badge {
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 48px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.12);
   display: flex;
@@ -94,9 +94,107 @@ body {
   cursor: pointer;
 }
 
+.lantern-mark {
+  display: block;
+  overflow: visible;
+}
+
+.lantern-mark .ln-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lantern-mark .ln-arm {
+  stroke-width: 3.1;
+}
+
+.lantern-mark .ln-guard {
+  stroke-width: 1.45;
+}
+
+.lantern-mark .ln-fill {
+  fill: currentColor;
+}
+
+.lantern-mark .ln-glass {
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 2.15;
+  stroke-linejoin: round;
+}
+
+.lantern-mark .ln-flame,
+.lantern-mark .ln-flame-core {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linejoin: round;
+}
+
+.lantern-mark .ln-flame-core,
+.lantern-mark .ln-glow {
+  opacity: 0;
+}
+
+.lantern-mark .ln-glow {
+  fill: #fbbf24;
+}
+
+.lantern-mark .ln-hole {
+  fill: #102747;
+}
+
+.lantern-mark .ln-knob {
+  fill: #102747;
+  stroke: currentColor;
+  stroke-width: 1.15;
+}
+
 .sidebar-brand-badge.is-admin-on {
-  background: rgba(251, 191, 36, 0.32);
-  box-shadow: 0 0 0 2px #fbbf24;
+  background: rgba(251, 191, 36, 0.22);
+  box-shadow: 0 0 16px 4px rgba(251, 191, 36, 0.72);
+}
+
+.sidebar-brand-badge.is-admin-on .ln-glass {
+  fill: rgba(253, 224, 71, 0.5);
+  stroke: #fde68a;
+}
+
+.sidebar-brand-badge.is-admin-on .ln-glow {
+  opacity: 0.62;
+}
+
+.sidebar-brand-badge.is-admin-on .ln-flame {
+  fill: #f59e0b;
+  stroke: #fbbf24;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: lantern-flicker 1.15s ease-in-out infinite;
+}
+
+.sidebar-brand-badge.is-admin-on .ln-flame-core {
+  opacity: 1;
+  fill: #fffbeb;
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: lantern-flicker 0.85s ease-in-out infinite;
+}
+
+@keyframes lantern-flicker {
+  0%, 100% { transform: scale(1, 1); }
+  40% { transform: scale(1.08, 0.9); }
+  70% { transform: scale(0.94, 1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-brand-badge.is-admin-on .ln-flame,
+  .sidebar-brand-badge.is-admin-on .ln-flame-core {
+    animation: none;
+  }
 }
 
 .admin-only,
@@ -187,6 +285,17 @@ body.is-admin .admin-only-delete {
 .sidebar-menu-item.active .sidebar-menu-icon {
   opacity: 1;
   color: #38BDF8;
+}
+
+.sidebar-skyline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 64px;
+  height: 125px;
+  pointer-events: none;
+  opacity: 0.22;
+  background: url('skyline-pueblo.svg') center bottom / 88% auto no-repeat;
 }
 
 /* --------------------------------------------------------------------------
@@ -1122,6 +1231,137 @@ body.is-admin .admin-only-delete {
   font-size: 13px;
   font-weight: 600;
   padding: 8px 16px;
+}
+
+.nuevo-reporte-btn {
+  display: flex;
+  flex: 0 0 60px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  min-width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 2px solid #8FB4E0;
+  border-radius: 8px;
+  background: var(--primary-dark);
+  color: #E8EEF6;
+  font-family: inherit;
+  font-weight: 700;
+  box-shadow: 2px 2px 0 #000;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.nuevo-reporte-btn::before,
+.nuevo-reporte-btn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transition: 0.6s;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.nuevo-reporte-btn::before { left: -100%; }
+.nuevo-reporte-btn::after { left: 100%; }
+
+.nuevo-reporte-btn:hover {
+  background: var(--primary);
+  border-color: #E8EEF6;
+  transform: translate(-2px, -2px) rotate(1deg);
+  box-shadow: 4px 4px 0 #000;
+}
+
+.nuevo-reporte-btn:hover::before { animation: nuevo-reporte-swipe-right 1.5s linear infinite; }
+.nuevo-reporte-btn:hover::after { animation: nuevo-reporte-swipe-left 1.5s linear infinite; }
+
+.nuevo-reporte-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #E8EEF6;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.nuevo-reporte-icon {
+  width: 26px;
+  height: 26px;
+  color: var(--primary-dark);
+  transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.nuevo-reporte-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+  text-align: center;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 3;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.nuevo-reporte-text span:first-child {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nuevo-reporte-text span:last-child {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.nuevo-reporte-btn:hover .nuevo-reporte-mark {
+  width: 22px;
+  height: 22px;
+  transform: translateY(-1px);
+}
+.nuevo-reporte-btn:hover .nuevo-reporte-icon {
+  width: 13px;
+  height: 13px;
+  animation: nuevo-reporte-spin 1.5s linear infinite;
+}
+.nuevo-reporte-btn:hover .nuevo-reporte-text {
+  opacity: 1;
+  max-height: 28px;
+  margin-top: 1px;
+}
+.nuevo-reporte-btn:active .nuevo-reporte-mark { transform: translateY(0); }
+.nuevo-reporte-btn:active .nuevo-reporte-text { transform: scale(0.95); }
+
+@keyframes nuevo-reporte-swipe-right {
+  100% { transform: translateX(200%) skew(-45deg); }
+}
+@keyframes nuevo-reporte-swipe-left {
+  100% { transform: translateX(-200%) skew(-45deg); }
+}
+@keyframes nuevo-reporte-spin {
+  0%, 28% { transform: rotate(0turn); }
+  72%, 100% { transform: rotate(1turn); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nuevo-reporte-btn:hover::before,
+  .nuevo-reporte-btn:hover::after,
+  .nuevo-reporte-btn:hover .nuevo-reporte-icon { animation: none; }
 }
 
 /* --------------------------------------------------------------------------
@@ -3222,9 +3462,1043 @@ button.sidebar-submenu-item {
   font-size: 12.5px;
 }
 
+.bitacora-previas {
+  margin: 16px 0 18px;
+}
+
 .form-section-title {
   margin: 0 0 12px;
   font-size: 16px;
   font-weight: 700;
   color: var(--primary);
+}
+
+/* ==========================================================================
+   PANTALLA — Tinta y papel
+   Solo vista en pantalla. La impresión conserva las reglas anteriores.
+   ========================================================================== */
+@media screen {
+  body {
+    background: #e6e1d6;
+    color: #243041;
+  }
+
+  .app-main-content {
+    animation: none;
+    background:
+      linear-gradient(to bottom,
+        rgba(239, 234, 225, 0.15) 0%,
+        rgba(239, 234, 225, 0.55) 180px,
+        rgba(239, 234, 225, 0.96) 340px,
+        #efeae1 100%),
+      linear-gradient(to right,
+        rgba(239, 234, 225, 0.92) 0%,
+        rgba(239, 234, 225, 0.70) 45%,
+        rgba(239, 234, 225, 0.10) 100%),
+      url('bg-alumbrado.jpg') top right / auto 420px no-repeat,
+      radial-gradient(980px 420px at 8% -8%, rgba(176, 146, 98, 0.16), transparent 62%),
+      linear-gradient(180deg, #efeae1 0%, #e4dfd4 100%);
+  }
+
+  .app-container {
+    animation: none;
+  }
+
+  .app-sidebar {
+    background: linear-gradient(180deg, #2a3546 0%, #1c2633 42%, #161d28 100%);
+    box-shadow: 10px 0 28px rgba(18, 24, 33, 0.16);
+  }
+
+  .sidebar-brand {
+    border-bottom-color: rgba(244, 236, 220, 0.08);
+  }
+
+  .sidebar-brand-badge {
+    border-radius: 14px;
+    background: rgba(244, 236, 220, 0.08);
+    transition: background 0.3s ease, transform 0.3s ease;
+  }
+
+  .sidebar-brand-badge:hover {
+    background: rgba(244, 236, 220, 0.14);
+    transform: translateY(-1px);
+  }
+
+  .sidebar-brand-badge.is-admin-on {
+    background: rgba(196, 149, 74, 0.2);
+    box-shadow: 0 0 14px 1px rgba(196, 149, 74, 0.38);
+  }
+
+  .sidebar-brand-sub {
+    color: #c9bfb0;
+  }
+
+  .sidebar-menu-item,
+  .sidebar-submenu-item,
+  .sidebar-footer-btn {
+    border-radius: 12px;
+    transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease;
+  }
+
+  .sidebar-menu-item:hover,
+  .sidebar-submenu-item:hover,
+  .sidebar-footer-btn:hover {
+    background: rgba(255, 248, 238, 0.07);
+    color: #f7f3ea;
+    transform: translateX(3px);
+  }
+
+  .sidebar-menu-item.active {
+    background: rgba(244, 236, 220, 0.12);
+    color: #f7f3ea;
+    border-left: 3px solid #c4a574;
+    box-shadow: none;
+  }
+
+  .sidebar-menu-item.active .sidebar-menu-icon,
+  .sidebar-submenu-item.active {
+    color: #e4d3b4;
+  }
+
+  .sidebar-submenu-item.active {
+    background: rgba(196, 165, 116, 0.14);
+    border-left-color: #c4a574;
+  }
+
+  .app-title,
+  .panel-title,
+  .list-toolbar-title {
+    letter-spacing: -0.03em;
+  }
+
+  .panel,
+  .records-container-card,
+  .modal-card,
+  .tool-card,
+  .kpi-banner {
+    background: rgba(255, 252, 247, 0.94);
+    border: 1px solid rgba(36, 48, 65, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 14px 34px rgba(36, 44, 56, 0.06);
+  }
+
+  .tool-card {
+    overflow: hidden;
+  }
+
+  .tool-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(140, 106, 61, 0.28);
+    box-shadow: 0 18px 36px rgba(36, 44, 56, 0.1);
+  }
+
+  .tool-card-banner {
+    background: linear-gradient(145deg, #243246 0%, #1a2636 100%);
+  }
+
+  .tool-card-icon-badge {
+    border-color: #c4a574;
+    background: rgba(196, 165, 116, 0.14);
+    color: #f0e4cc;
+    box-shadow: none;
+  }
+
+  .tool-card-accent-line {
+    background: #a68456;
+  }
+
+  .tool-card-btn {
+    border-radius: 999px;
+    background: #243246;
+  }
+
+  .tool-card-btn:hover {
+    background: #31445c;
+  }
+
+  .field-input,
+  .field-select,
+  .field-textarea,
+  .pagination-rows-select {
+    border-radius: 10px;
+    border-color: #ddd4c4;
+    background: #fffdf9;
+  }
+
+  .field-input:focus,
+  .field-select:focus,
+  .field-textarea:focus {
+    border-color: #8c6a3d;
+    box-shadow: 0 0 0 3px rgba(140, 106, 61, 0.15);
+  }
+
+  .btn,
+  .pagination-btn,
+  .btn-icon-action,
+  .btn-table-action {
+    border-radius: 999px;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .btn:hover:not(:active),
+  .pagination-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(36, 48, 65, 0.08);
+  }
+
+  .btn-primary,
+  .btn-navy,
+  .pagination-btn.active {
+    background: #243246;
+    border-color: #243246;
+  }
+
+  .btn-primary:hover,
+  .btn-navy:hover {
+    background: #31445c;
+  }
+
+  .btn-success {
+    background: #2f6d4f;
+    border-color: #275c42;
+  }
+
+  .btn-success:hover {
+    background: #275c42;
+  }
+
+  #btnToggleVista {
+    background: #3e4d62 !important;
+    border-color: #3e4d62 !important;
+    color: #f7f3ea !important;
+  }
+
+  #btnToggleVista:hover {
+    background: #31445c !important;
+  }
+
+  .records-table thead {
+    background: #f4efe6;
+  }
+
+  .records-table th {
+    color: #3d4c60;
+  }
+
+  .records-table tbody tr {
+    transition: background-color 0.2s ease;
+  }
+
+  .records-table tbody tr:hover {
+    background: #f8f4ec;
+  }
+
+  .table-responsive {
+    border-radius: 14px;
+    border-color: rgba(36, 48, 65, 0.08);
+  }
+
+  .table-pagination {
+    background: #f7f3ec;
+    border-top-color: rgba(36, 48, 65, 0.08);
+  }
+
+  .stat-pill {
+    background: #f7f3ec;
+    border-color: rgba(36, 48, 65, 0.08);
+  }
+
+  .modal-overlay {
+    background: rgba(22, 26, 32, 0.4);
+    backdrop-filter: blur(7px);
+  }
+
+  .modal-card {
+    animation: rise-in 0.28s ease both;
+  }
+
+  .toast-notification {
+    border-radius: 16px;
+    box-shadow: 0 16px 34px rgba(36, 44, 56, 0.14);
+  }
+
+  .nuevo-reporte-btn {
+    border: 1px solid rgba(255, 248, 238, 0.16);
+    border-radius: 16px;
+    background: linear-gradient(165deg, #31445c 0%, #1d2836 100%);
+    box-shadow: 0 8px 18px rgba(22, 28, 36, 0.22);
+  }
+
+  .nuevo-reporte-btn::before,
+  .nuevo-reporte-btn::after {
+    background: linear-gradient(90deg, transparent, rgba(244, 236, 220, 0.28), transparent);
+  }
+
+  .nuevo-reporte-btn:hover {
+    background: linear-gradient(165deg, #3a516c 0%, #243246 100%);
+    border-color: rgba(228, 211, 180, 0.45);
+    transform: none;
+    box-shadow: 0 10px 22px rgba(22, 28, 36, 0.26);
+  }
+
+  .nuevo-reporte-mark {
+    background: #f6f1e7;
+    box-shadow: inset 0 0 0 1px rgba(140, 106, 61, 0.16);
+  }
+
+  .nivel-option.is-selected {
+    border-color: #8c6a3d;
+    box-shadow: 0 0 0 2px rgba(140, 106, 61, 0.16);
+  }
+}
+
+@keyframes canvas-drift {
+  0%, 100% { background-position: 0% 0%, 100% 0%, 0 0; }
+  50% { background-position: 40% 20%, 60% 10%, 0 0; }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.admin-gate-card {
+  position: relative;
+  width: min(380px, 100%);
+  padding-top: 28px;
+}
+
+.admin-gate-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #5A6A7E;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-gate-close:hover {
+  background: rgba(36, 48, 65, 0.08);
+  color: #243246;
+}
+
+.admin-pass-form {
+  margin-top: 4px;
+  padding: 4px;
+  background: #f4efe6;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  box-shadow: 0 0 0 1px #c4a574;
+  transition: box-shadow 0.35s ease;
+}
+
+.admin-pass-form:hover,
+.admin-pass-form:focus-within {
+  box-shadow: 0 0 0 1px #8c6a3d, 0 8px 18px rgba(36, 48, 65, 0.08);
+}
+
+.admin-pass-field {
+  display: block;
+  margin: 0;
+}
+
+.admin-pass-input,
+.admin-pass-submit {
+  border: 0;
+  outline: 0;
+  width: 100%;
+  padding: 12px 10px;
+  text-align: center;
+  font-weight: 700;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 14px;
+}
+
+.admin-pass-input {
+  color: #5A6A7E;
+  background: #fffdf9;
+  border-radius: 14px 14px 0 0;
+}
+
+.admin-pass-input::placeholder {
+  color: #8A99AD;
+  font-weight: 700;
+}
+
+.admin-pass-submit {
+  border-radius: 0 0 14px 14px;
+  background: #243246;
+  color: #f6f1e7;
+  cursor: pointer;
+  transition: background 0.35s ease, color 0.35s ease;
+}
+
+.admin-pass-submit:hover {
+  background: #f6f1e7;
+  color: #243246;
+}
+
+.admin-pass-form.is-exit .admin-pass-submit {
+  border-radius: 14px;
+}
+
+@media screen and (prefers-reduced-motion: reduce) {
+  .app-main-content,
+  .app-container,
+  .modal-card,
+  .sidebar-menu-item,
+  .sidebar-submenu-item,
+  .tool-card,
+  .btn {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Pantalla de reportes — con la misma paleta y colores que el resto de las interfaces. No altera la impresión. */
+@media screen {
+  body.vista-reportes-dash {
+    background: #e6e1d6;
+    color: #243041;
+  }
+
+  /* Fondo armonizado con los colores cálidos de las otras interfaces, integrando la imagen nocturna */
+  body.vista-reportes-dash .app-main-content {
+    animation: none;
+    position: relative;
+    background:
+      linear-gradient(to bottom,
+        rgba(239, 234, 225, 0.15) 0%,
+        rgba(239, 234, 225, 0.55) 180px,
+        rgba(239, 234, 225, 0.96) 340px,
+        #efeae1 100%),
+      linear-gradient(to right,
+        rgba(239, 234, 225, 0.92) 0%,
+        rgba(239, 234, 225, 0.70) 45%,
+        rgba(239, 234, 225, 0.10) 100%),
+      url('bg-alumbrado.jpg') top right / auto 420px no-repeat,
+      radial-gradient(980px 420px at 8% -8%, rgba(176, 146, 98, 0.16), transparent 62%),
+      linear-gradient(180deg, #efeae1 0%, #e4dfd4 100%);
+  }
+
+  body.vista-reportes-dash .app-container {
+    animation: none;
+    padding: 22px 28px 36px;
+  }
+
+  /* Menú lateral compartido: el mismo en todas las pantallas */
+  .app-sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: linear-gradient(180deg, #2a3546 0%, #1c2633 42%, #161d28 100%);
+    box-shadow: 10px 0 28px rgba(18, 24, 33, 0.16);
+  }
+
+  .sidebar-brand {
+    border-bottom-color: rgba(244, 236, 220, 0.08);
+  }
+
+  .sidebar-brand-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1.2;
+  }
+
+  .sidebar-brand-sub {
+    color: #c9bfb0;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .sidebar-menu {
+    position: relative;
+    z-index: 1;
+    padding-bottom: 28px;
+  }
+
+  .sidebar-menu-item,
+  .sidebar-menu-item:hover {
+    transform: none;
+    border-radius: 12px;
+    color: #c9bfb0;
+    transition: background 0.25s ease, color 0.25s ease;
+  }
+
+  .sidebar-menu-item:hover {
+    background: rgba(255, 248, 238, 0.07);
+    color: #f7f3ea;
+  }
+
+  /* Opción activa — acento dorado idéntico al resto del sistema */
+  .sidebar-menu-item.active {
+    background: rgba(244, 236, 220, 0.12);
+    color: #f7f3ea;
+    border-left: 3px solid #c4a574;
+    box-shadow: none;
+    animation: sidebar-lugar 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .sidebar-menu-item.active .sidebar-menu-icon {
+    color: #e4d3b4;
+  }
+
+  .sidebar-skyline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 64px;
+    height: 125px;
+    pointer-events: none;
+    opacity: 0.22;
+    background: url('skyline-pueblo.svg') center bottom / 88% auto no-repeat;
+  }
+
+  .sidebar-footer {
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(180deg, transparent, #161d28 28%);
+  }
+
+  @keyframes sidebar-lugar {
+    from {
+      background-color: transparent;
+      border-left-color: transparent;
+    }
+    to {
+      background-color: rgba(244, 236, 220, 0.12);
+      border-left-color: #c4a574;
+    }
+  }
+
+  /* ── Header de la vista de reportes ── */
+  body.vista-reportes-dash .dash-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  body.vista-reportes-dash .app-title {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    color: #243041;
+  }
+
+  body.vista-reportes-dash .dash-subtitle {
+    margin: 4px 0 0;
+    color: #5a6a7e;
+    font-size: 14px;
+  }
+
+  body.vista-reportes-dash .dash-header-actions {
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* ── Chips / botones del header con los mismos colores de las otras interfaces ── */
+  body.vista-reportes-dash .dash-chip {
+    height: 38px;
+    min-height: 38px;
+    border-radius: 999px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  body.vista-reportes-dash .dash-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(36, 48, 65, 0.08);
+  }
+
+  /* Búsqueda Avanzada: botón secundario idéntico a las otras interfaces */
+  body.vista-reportes-dash .btn-secondary.dash-chip {
+    background: #fffdf9;
+    border: 1px solid #ddd4c4;
+    color: #243041;
+    box-shadow: 0 2px 6px rgba(36, 48, 65, 0.05);
+  }
+
+  body.vista-reportes-dash .btn-secondary.dash-chip:hover {
+    background: #f7f3ea;
+    border-color: #8c6a3d;
+    color: #243041;
+  }
+
+  /* Generar Informe: verde idéntico a btn-success de las otras interfaces */
+  body.vista-reportes-dash .btn-success.dash-chip {
+    background: #2f6d4f;
+    border: 1px solid #275c42;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(47, 109, 79, 0.2);
+  }
+
+  body.vista-reportes-dash .btn-success.dash-chip:hover {
+    background: #275c42;
+    border-color: #275c42;
+    color: #fff;
+  }
+
+  /* Exportar / Imprimir PDF: azul marino idéntico a btn-primary del resto de la app */
+  body.vista-reportes-dash .btn-primary.dash-chip {
+    background: #243246;
+    border: 1px solid #243246;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(36, 50, 70, 0.2);
+  }
+
+  body.vista-reportes-dash .btn-primary.dash-chip:hover {
+    background: #31445c;
+    border-color: #31445c;
+    color: #fff;
+  }
+
+  /* Nuevo reporte: azul marino idéntico al resto de interfaces */
+  body.vista-reportes-dash .nuevo-reporte-btn {
+    width: auto;
+    min-width: 0;
+    min-height: 38px;
+    height: 38px;
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 6px;
+    background: #243246;
+    color: #fff;
+    border: 1px solid #243246;
+    border-radius: 999px;
+    padding: 0 16px;
+    box-shadow: 0 2px 6px rgba(36, 50, 70, 0.2);
+    transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  body.vista-reportes-dash .nuevo-reporte-btn:hover {
+    width: auto;
+    min-width: 0;
+    height: 38px;
+    flex-basis: auto;
+    transform: translateY(-1px);
+    background: #31445c;
+    border-color: #31445c;
+    box-shadow: 0 8px 16px rgba(36, 48, 65, 0.12);
+  }
+
+  body.vista-reportes-dash .nuevo-reporte-mark { display: none; }
+  body.vista-reportes-dash .nuevo-reporte-text,
+  body.vista-reportes-dash .nuevo-reporte-btn:hover .nuevo-reporte-text {
+    opacity: 1;
+    max-height: none;
+    margin: 0;
+    flex-direction: row;
+    gap: 4px;
+    overflow: visible;
+  }
+
+  body.vista-reportes-dash .nuevo-reporte-text span:first-child,
+  body.vista-reportes-dash .nuevo-reporte-text span:last-child {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  body.vista-reportes-dash .nuevo-reporte-btn:hover::before,
+  body.vista-reportes-dash .nuevo-reporte-btn:hover::after,
+  body.vista-reportes-dash .nuevo-reporte-btn:hover .nuevo-reporte-icon { animation: none; }
+
+  /* Solicitudes: botón de toggle igual a las otras interfaces */
+  body.vista-reportes-dash #btnToggleVista {
+    background: #3e4d62 !important;
+    border-color: #3e4d62 !important;
+    color: #f7f3ea !important;
+    box-shadow: 0 2px 6px rgba(62, 77, 98, 0.2);
+  }
+
+  body.vista-reportes-dash #btnToggleVista:hover {
+    background: #31445c !important;
+    border-color: #31445c !important;
+  }
+
+  /* ── KPI Cards — fondo marfil y sombra cálida como en el resto de la app ── */
+  body.vista-reportes-dash .dash-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  body.vista-reportes-dash .dash-kpi {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 88px;
+    padding: 16px 18px;
+    background: rgba(255, 252, 247, 0.94);
+    border: 1px solid rgba(36, 48, 65, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 14px 34px rgba(36, 44, 56, 0.06);
+  }
+
+  body.vista-reportes-dash .dash-kpi strong {
+    display: block;
+    font-size: 28px;
+    line-height: 1;
+    color: #243041;
+  }
+
+  body.vista-reportes-dash .dash-kpi span:last-child {
+    color: #5a6a7e;
+    font-size: 13px;
+  }
+
+  body.vista-reportes-dash .dash-kpi-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  body.vista-reportes-dash .kpi-blue  { background: #e7f0ff; color: #2f63d6; }
+  body.vista-reportes-dash .kpi-green { background: #e5f7ee; color: #1f9d61; }
+  body.vista-reportes-dash .kpi-amber { background: #fff1df; color: #e0892f; }
+  body.vista-reportes-dash .kpi-violet{ background: #efeaff; color: #7a5af0; }
+
+  /* ── Contenedor y tabla de registros ── */
+  body.vista-reportes-dash .records-container-card {
+    background: rgba(255, 252, 247, 0.94);
+    border: 1px solid rgba(36, 48, 65, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 14px 34px rgba(36, 44, 56, 0.06);
+    padding: 16px 16px 8px;
+  }
+
+  body.vista-reportes-dash .dash-filters { margin-bottom: 12px; }
+
+  body.vista-reportes-dash .dash-search {
+    max-width: none;
+    height: 42px;
+    padding: 0 14px;
+    border: 1px solid #ddd4c4;
+    border-radius: 10px;
+    background: #fffdf9;
+    color: #5a6a7e;
+  }
+
+  body.vista-reportes-dash .dash-search .field-input {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    height: 40px;
+    color: #243041;
+  }
+
+  body.vista-reportes-dash .dash-search .field-input:focus { box-shadow: none; }
+
+  body.vista-reportes-dash .dash-select {
+    height: 42px;
+    min-width: 170px;
+    border-radius: 10px;
+    border-color: #ddd4c4;
+    background: #fffdf9;
+    color: #243041;
+  }
+
+  body.vista-reportes-dash .dash-select:focus {
+    border-color: #8c6a3d;
+    box-shadow: 0 0 0 3px rgba(140, 106, 61, 0.15);
+  }
+
+  body.vista-reportes-dash #vistaReportes .records-table,
+  body.vista-reportes-dash #vistaSolicitudes .records-table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  body.vista-reportes-dash .table-responsive {
+    border: 1px solid rgba(36, 48, 65, 0.08);
+    border-radius: 14px;
+  }
+
+  body.vista-reportes-dash #vistaReportes .records-table thead,
+  body.vista-reportes-dash #vistaSolicitudes .records-table thead {
+    background: #f4efe6;
+  }
+
+  body.vista-reportes-dash #vistaReportes .records-table th,
+  body.vista-reportes-dash #vistaSolicitudes .records-table th {
+    color: #3d4c60;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    border-bottom: 2px solid #e8e0d2;
+  }
+
+  body.vista-reportes-dash #vistaReportes .records-table td,
+  body.vista-reportes-dash #vistaSolicitudes .records-table td {
+    border-bottom: 1px solid #f0ebe2;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    color: #243041;
+  }
+
+  body.vista-reportes-dash #vistaReportes .records-table tbody tr:hover,
+  body.vista-reportes-dash #vistaSolicitudes .records-table tbody tr:hover {
+    background: #f8f4ec;
+  }
+
+  body.vista-reportes-dash .folio-pill {
+    display: inline-flex;
+    min-width: 46px;
+    justify-content: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eef2f7;
+    color: #243246;
+    font-weight: 700;
+  }
+
+  body.vista-reportes-dash .folio-pill.is-sf {
+    background: #f4efe6;
+    color: #8c7f6e;
+  }
+
+  body.vista-reportes-dash .btn-icon-action {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #fffdf9;
+    border-color: #ddd4c4;
+    color: #5a6a7e;
+  }
+
+  body.vista-reportes-dash .btn-icon-action:hover {
+    background: #243246;
+    border-color: #243246;
+    color: #fff;
+    transform: none;
+  }
+
+  body.vista-reportes-dash .btn-icon-action-check {
+    color: #1f9d61;
+    border-color: #b7ebcf;
+    background: #f3fbf6;
+  }
+
+  body.vista-reportes-dash .table-pagination {
+    background: #f7f3ec;
+    border-top: 1px solid rgba(36, 48, 65, 0.08);
+    padding: 12px 14px 10px;
+  }
+
+  body.vista-reportes-dash .pagination-btn {
+    border-radius: 999px;
+    background: #fffdf9;
+    border-color: #ddd4c4;
+    color: #243041;
+    box-shadow: none;
+  }
+
+  body.vista-reportes-dash .pagination-btn:hover:not(:disabled) {
+    background: #f7f3ea;
+    border-color: #8c6a3d;
+  }
+
+  body.vista-reportes-dash .pagination-btn.active {
+    background: #243246;
+    border-color: #243246;
+    color: #fff;
+  }
+}
+
+@media screen and (max-width: 1100px) {
+  body.vista-reportes-dash .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body.vista-reportes-dash .app-main-content {
+    background:
+      linear-gradient(to bottom,
+        rgba(239, 234, 225, 0.2) 0%,
+        rgba(239, 234, 225, 0.96) 240px,
+        #efeae1 100%),
+      url('bg-alumbrado.jpg') top right / auto 300px no-repeat,
+      linear-gradient(180deg, #efeae1 0%, #e4dfd4 100%);
+  }
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+@media screen {
+  .app-sidebar {
+    view-transition-name: app-sidebar;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0s;
+  }
+
+  ::view-transition-old(app-sidebar),
+  ::view-transition-new(app-sidebar) {
+    animation-duration: 0.28s;
+    animation-timing-function: ease;
+  }
+}
+
+@media print {
+  #entradaDia { display: none !important; }
+}
+
+#entradaDia {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #efeae1;
+}
+
+#entradaDia.is-done {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+#entradaDia .loader {
+  scale: 0.75;
+  position: relative;
+  width: 200px;
+  height: 200px;
+  translate: 10px -20px;
+}
+
+#entradaDia .loader svg { position: absolute; top: 0; left: 0; }
+#entradaDia .head { translate: 27px -30px; z-index: 3; animation: entrada-bob 1s infinite ease-in; }
+#entradaDia .bod { translate: 0 30px; z-index: 3; animation: entrada-bob 1s infinite ease-in-out; }
+#entradaDia .legr { translate: 75px 135px; z-index: 0; animation: entrada-rstep 1s infinite ease-in; animation-delay: 0.45s; }
+#entradaDia .legl { translate: 30px 155px; z-index: 3; animation: entrada-lstep 1s infinite ease-in; }
+#entradaDia #gnd {
+  translate: -140px 0;
+  rotate: 10deg;
+  z-index: -1;
+  filter: blur(0.5px) drop-shadow(1px 3px 5px #000);
+  opacity: 0.25;
+  animation: entrada-scroll 5s infinite linear;
+}
+
+@keyframes entrada-bob {
+  0%, 5% { transform: translateY(0) rotate(3deg); }
+  25% { transform: translateY(5px) rotate(0deg); }
+  50% { transform: translateY(0) rotate(-3deg); }
+  70% { transform: translateY(5px) rotate(0deg); }
+  100% { transform: translateY(0) rotate(3deg); }
+}
+@keyframes entrada-lstep {
+  0% { transform: translateY(0) rotate(-5deg); }
+  33% { transform: translateY(-15px) translate(32px) rotate(35deg); }
+  66% { transform: translateY(0) translate(25px) rotate(-25deg); }
+  100% { transform: translateY(0) rotate(-5deg); }
+}
+@keyframes entrada-rstep {
+  0% { transform: translateY(0) rotate(-5deg); }
+  33% { transform: translateY(-10px) translate(30px) rotate(35deg); }
+  66% { transform: translateY(0) translate(20px) rotate(-25deg); }
+  100% { transform: translateY(0) rotate(-5deg); }
+}
+@keyframes entrada-scroll {
+  0% { transform: translateY(25px) translate(50px); opacity: 0; }
+  33%, 66% { opacity: 0.25; }
+  100% { transform: translateY(-50px) translate(-100px); opacity: 0; }
+}
+
+a.learn-more {
+  position: relative;
+  display: inline-block;
+  width: 11.5rem;
+  height: 3rem;
+  cursor: pointer;
+  text-decoration: none;
+  vertical-align: middle;
+}
+a.learn-more .circle {
+  transition: width 0.45s cubic-bezier(0.65, 0, 0.076, 1);
+  position: relative;
+  display: block;
+  margin: 0;
+  width: 3rem;
+  height: 3rem;
+  background: #243246;
+  border-radius: 1.625rem;
+}
+a.learn-more .circle .icon {
+  transition: transform 0.45s cubic-bezier(0.65, 0, 0.076, 1), background 0.45s cubic-bezier(0.65, 0, 0.076, 1);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  background: #fff;
+}
+a.learn-more .circle .icon.arrow {
+  left: 0.625rem;
+  width: 1.125rem;
+  height: 0.125rem;
+  background: none;
+}
+a.learn-more .circle .icon.arrow::before {
+  position: absolute;
+  content: "";
+  top: -0.29rem;
+  left: 0.02rem;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-top: 0.125rem solid #fff;
+  border-left: 0.125rem solid #fff;
+  transform: rotate(-45deg);
+}
+a.learn-more .button-text {
+  transition: color 0.45s cubic-bezier(0.65, 0, 0.076, 1);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.75rem 0;
+  margin: 0 0 0 1.7rem;
+  color: #243041;
+  font-weight: 700;
+  line-height: 1.6;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+a.learn-more:hover .circle { width: 100%; }
+a.learn-more:hover .circle .icon.arrow {
+  background: #fff;
+  transform: translate(-0.65rem, 0);
+}
+a.learn-more:hover .button-text { color: #f7f3ea; }
+
+@media screen and (prefers-reduced-motion: reduce) {
+  .sidebar-menu-item.active { animation: none; }
+  ::view-transition-old(app-sidebar),
+  ::view-transition-new(app-sidebar) { animation-duration: 0s; }
 }

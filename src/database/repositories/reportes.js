@@ -18,6 +18,7 @@ import {
 } from '../core.js';
 
 import { findOrCreateLocalidad } from './localidades.js';
+import { queryPage, queryMatching, likeParam, sqlLike } from '../page.js';
 import { enqueueRecord, processSyncQueue } from './syncQueue.js';
 
 const TABLE = 'reportes';
@@ -208,5 +209,108 @@ export async function getReporteById(id) {
 
   const all = await idbGetAll(TABLE);
   return all.find((r) => r.id === id) || null;
+}
+
+const CAMPOS_REPORTE = [
+  'folio', 'usuario', 'atendio', 'direccion', 'colonia_comunidad', 'tipo_localidad',
+  'tipo_falla', 'tipo_lampara', 'referencias', 'entre_calles', 'observaciones', 'telefono', 'estatus',
+];
+
+const ORDEN_REPORTE = `
+  CASE
+    WHEN lower(trim(IFNULL(estatus, ''))) IN ('atendido', 'atendida') THEN 0
+    WHEN lower(trim(IFNULL(estatus, ''))) = 'en espera' THEN 1
+    WHEN lower(trim(IFNULL(estatus, ''))) = 'pendiente' THEN 2
+    WHEN lower(trim(IFNULL(estatus, ''))) = 'urgente' THEN 3
+    ELSE 4
+  END DESC,
+  COALESCE(NULLIF(fecha, ''), '9999-99-99') ASC,
+  IFNULL(folio, '') ASC
+`;
+
+function esAtendido(valor) {
+  const v = String(valor || '').trim().toLowerCase();
+  return v === 'atendido' || v === 'atendida';
+}
+
+function rangoReporte(a, b) {
+  const rank = (estatus) => {
+    const s = String(estatus || '').trim().toLowerCase();
+    if (esAtendido(s)) return 0;
+    if (s === 'en espera') return 1;
+    if (s === 'pendiente') return 2;
+    if (s === 'urgente') return 3;
+    return 4;
+  };
+  const d = rank(b.estatus) - rank(a.estatus);
+  if (d) return d;
+  const fa = a.fecha || '9999-99-99';
+  const fb = b.fecha || '9999-99-99';
+  if (fa !== fb) return fa.localeCompare(fb);
+  return String(a.folio || '').localeCompare(String(b.folio || ''));
+}
+
+function filtroReporte({ estatus = 'sin_atender', texto = '' } = {}) {
+  const like = texto.trim() ? likeParam(texto) : '';
+  return {
+    whereSql: `(
+        ($1 = 'atendido' AND lower(trim(IFNULL(estatus, ''))) IN ('atendido', 'atendida'))
+        OR ($1 <> 'atendido' AND lower(trim(IFNULL(estatus, ''))) NOT IN ('atendido', 'atendida'))
+      ) AND (
+        $2 = '' OR ${sqlLike(CAMPOS_REPORTE, 3)}
+      )`,
+    params: [estatus === 'atendido' ? 'atendido' : 'sin_atender', like ? '1' : '', ...CAMPOS_REPORTE.map(() => like || '%')],
+    idbFilter: (r) => {
+      const atendido = esAtendido(r.estatus);
+      if ((estatus === 'atendido') !== atendido) return false;
+      const q = texto.trim().toLowerCase();
+      if (!q) return true;
+      return CAMPOS_REPORTE.some((campo) => String(r[campo] || '').toLowerCase().includes(q));
+    },
+  };
+}
+
+function specReporte(filtro) {
+  return {
+    fromSql: 'reportes',
+    whereSql: filtro.whereSql,
+    params: filtro.params,
+    orderSql: ORDEN_REPORTE,
+    extraSql: `SUM(CASE WHEN numero_lamparas IS NULL OR numero_lamparas = 0 THEN 1 ELSE numero_lamparas END) AS lamparas`,
+    idbAll: () => idbGetAll('reportes'),
+    idbFilter: filtro.idbFilter,
+    idbCompare: rangoReporte,
+    idbStats: (list) => ({
+      lamparas: list.reduce((acc, r) => acc + (parseInt(r.numero_lamparas, 10) || 1), 0),
+    }),
+  };
+}
+
+export async function listReportesPage(opciones = {}) {
+  return queryPage({ ...specReporte(filtroReporte(opciones)), limit: opciones.limit, offset: opciones.offset });
+}
+
+export async function listReportesMatching(opciones = {}) {
+  return queryMatching(specReporte(filtroReporte(opciones)));
+}
+
+export async function resumenReportes() {
+  const page = await queryPage({
+    fromSql: 'reportes',
+    whereSql: '1=1',
+    params: [],
+    orderSql: 'fecha DESC',
+    limit: 1,
+    offset: 0,
+    extraSql: `SUM(CASE WHEN lower(trim(IFNULL(estatus, ''))) IN ('atendido', 'atendida') THEN 1 ELSE 0 END) AS atendidos`,
+    idbAll: () => idbGetAll('reportes'),
+    idbStats: (list) => ({
+      atendidos: list.filter((r) => esAtendido(r.estatus)).length,
+    }),
+  });
+  return {
+    total: Number(page.total || 0),
+    atendidos: Number(page.stats?.atendidos || 0),
+  };
 }
 

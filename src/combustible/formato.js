@@ -91,6 +91,20 @@ export function fechaDocumento(iso) {
   return `${p.d}/${p.m + 1}/${p.y}`;
 }
 
+/** Fecha de bitácora: el día siempre ocupa dos dígitos (6 → 06). */
+export function fechaBitacora(iso) {
+  const p = partesFecha(iso);
+  if (!p) return '';
+  return `${String(p.d).padStart(2, '0')}/${p.m + 1}/${p.y}`;
+}
+
+/** De la carga más reciente a la más antigua. */
+export function compararCargaReciente(a, b) {
+  const porFecha = String(b.fecha_ticket || '').localeCompare(String(a.fecha_ticket || ''));
+  if (porFecha) return porFecha;
+  return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+}
+
 export function tituloSemana(inicio, fin) {
   const a = partesFecha(inicio);
   const b = partesFecha(fin);

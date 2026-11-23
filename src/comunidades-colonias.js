@@ -8,7 +8,7 @@
 
 import {
   initDatabase,
-  getAllLocalidades,
+  listLocalidadesPage,
   saveLocalidad,
   updateLocalidad,
   deleteLocalidad,
@@ -32,6 +32,8 @@ const esc = (s) =>
 // Estado
 // ---------------------------------------------------------------------------
 let allLocalidades = [];
+let totalLocalidades = 0;
+let cargaLocalidades = 0;
 let editingId = null;
 let refreshAdminDelete = () => {};
 let deletingId = null;
@@ -39,7 +41,7 @@ let toastTimeout = null;
 
 const paginator = new TablePaginator({
   containerId: 'tablePagination',
-  onPageChange: () => renderTable(),
+  onPageChange: () => { cargarLocalidades(); },
   storageKey: 'paginator_localidades',
 });
 
@@ -90,24 +92,29 @@ const TRASH_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" 
 // ---------------------------------------------------------------------------
 // Render tabla
 // ---------------------------------------------------------------------------
+async function cargarLocalidades({ reset = false } = {}) {
+  if (reset) paginator.resetPage();
+  const token = ++cargaLocalidades;
+  const limit = paginator.getRowsPerPage();
+  const offset = (paginator.currentPage - 1) * limit;
+  try {
+    const page = await listLocalidadesPage({
+      tipo: $('filterTipo')?.value || '',
+      texto: ($('searchLocalidades')?.value || '').trim(),
+      limit,
+      offset,
+    });
+    if (token !== cargaLocalidades) return;
+    allLocalidades = page.rows;
+    totalLocalidades = page.total;
+    renderTable();
+  } catch (err) {
+    console.error('[comunidades-colonias] Error al cargar localidades:', err);
+  }
+}
+
 function getFilteredList() {
-  const query  = ($('searchLocalidades')?.value || '').trim().toLowerCase();
-  const tipo   = $('filterTipo')?.value || '';
-
-  let list = allLocalidades;
-
-  if (tipo) {
-    list = list.filter((r) => r.tipo === tipo);
-  }
-
-  if (query) {
-    list = list.filter((r) =>
-      (r.nombre || '').toLowerCase().includes(query) ||
-      (r.tipo || '').toLowerCase().includes(query)
-    );
-  }
-
-  return list;
+  return allLocalidades;
 }
 
 function tipoLabel(tipo) {
@@ -122,9 +129,9 @@ function renderTable() {
 
   const list = getFilteredList();
 
-  if ($('lblTotal')) $('lblTotal').textContent = list.length;
+  if ($('lblTotal')) $('lblTotal').textContent = totalLocalidades;
 
-  const pageData = paginator.getCurrentSlice(list);
+  const pageData = list;
 
   if (pageData.length === 0) {
     const q = ($('searchLocalidades')?.value || '').trim();
@@ -135,7 +142,7 @@ function renderTable() {
         </td>
       </tr>
     `;
-    paginator.update(list.length);
+    paginator.update(totalLocalidades);
     return;
   }
 
@@ -164,7 +171,7 @@ function renderTable() {
     btn.onclick = () => openEliminarModal(btn.dataset.eliminar);
   });
 
-  paginator.update(list.length);
+  paginator.update(totalLocalidades);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,9 +214,8 @@ refreshAdminDelete = bindAdminDelete({
   getId: () => editingId,
   removeLocal: (id) => deleteLocalidad(id),
   after: () => {
-    allLocalidades = allLocalidades.filter((r) => r.id !== editingId);
     closeLocalidadModal();
-    renderTable();
+    cargarLocalidades();
   },
 });
 
@@ -300,8 +306,7 @@ async function guardarLocalidad(e) {
     }
 
     closeLocalidadModal();
-    allLocalidades = await getAllLocalidades();
-    renderTable();
+    await cargarLocalidades();
     showToast('success', isEdit ? 'Localidad actualizada correctamente' : 'Localidad guardada correctamente');
   } catch (err) {
     console.error('[comunidades-colonias] Error al guardar:', err);
@@ -319,14 +324,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('[comunidades-colonias] Error al conectar BD:', err);
   }
 
-  try {
-    allLocalidades = await getAllLocalidades();
-  } catch (err) {
-    console.error('[comunidades-colonias] Error al cargar localidades:', err);
-    allLocalidades = [];
-  }
-
-  renderTable();
+  await cargarLocalidades();
   attachInputNormalizers(document);
 
   $('toastClose')?.addEventListener('click', () => {
@@ -336,12 +334,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Búsqueda y filtro en tiempo real
   $('searchLocalidades')?.addEventListener('input', () => {
-    paginator.resetPage();
-    renderTable();
+    cargarLocalidades({ reset: true });
   });
   $('filterTipo')?.addEventListener('change', () => {
-    paginator.resetPage();
-    renderTable();
+    cargarLocalidades({ reset: true });
   });
 
   // Botón Agregar

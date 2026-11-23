@@ -1,14 +1,37 @@
 import {
   initDatabase,
-  getAllVehiculos,
   saveVehiculo,
   deleteVehiculo,
+  listVehiculosPage,
 } from './db.js';
 import { bindAdminDelete } from './admin-mode.js';
+import { TablePaginator } from './table-pagination.js';
 import { esc, mensajeError } from './combustible/formato.js';
 
 const $ = (id) => document.getElementById(id);
+
+const paginator = new TablePaginator({
+  containerId: 'tablePagination',
+  onPageChange: () => { recargar(); },
+  storageKey: 'paginator_vehiculos',
+});
+
+const EYE_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </svg>
+`;
+
+const PENCIL_ICON = `
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 20h9"></path>
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+  </svg>
+`;
+
 let vehiculos = [];
+let totalVehiculos = 0;
 let editando = false;
 let editId = '';
 
@@ -83,10 +106,11 @@ function filtrados() {
 }
 
 function render() {
-  const rows = filtrados();
-  $('lblTotalVehiculos').textContent = String(rows.length);
+  const rows = vehiculos;
+  $('lblTotalVehiculos').textContent = String(totalVehiculos);
   if (rows.length === 0) {
     $('tablaVehiculos').innerHTML = '<tr><td colspan="8">No hay vehículos con ese criterio.</td></tr>';
+    paginator.update(totalVehiculos);
     return;
   }
   $('tablaVehiculos').innerHTML = rows.map((v) => `
@@ -98,11 +122,14 @@ function render() {
       <td>${esc(v.num_resguardo)}</td>
       <td>${esc(v.responsable_bien)}</td>
       <td>${esc(v.estado || 'Activo')}</td>
-      <td>
-        <button type="button" class="btn btn-secondary" data-accion="ver" data-id="${esc(v.id)}">Ver</button>
-        <button type="button" class="btn btn-secondary" data-accion="editar" data-id="${esc(v.id)}">Editar</button>
+      <td class="td-center">
+        <div class="table-actions">
+          <button type="button" class="btn-icon-action" data-accion="ver" data-id="${esc(v.id)}" title="Ver detalle" aria-label="Ver detalle">${EYE_ICON}</button>
+          <button type="button" class="btn-icon-action" data-accion="editar" data-id="${esc(v.id)}" title="Editar vehículo" aria-label="Editar vehículo">${PENCIL_ICON}</button>
+        </div>
       </td>
     </tr>`).join('');
+  paginator.update(totalVehiculos);
 }
 
 function abrirDetalle(v) {
@@ -123,8 +150,17 @@ function abrirDetalle(v) {
   };
 }
 
-async function recargar() {
-  vehiculos = await getAllVehiculos();
+async function recargar({ reset = false } = {}) {
+  if (reset) paginator.resetPage();
+  const limit = paginator.getRowsPerPage();
+  const page = await listVehiculosPage({
+    estado: $('filtroEstado').value,
+    texto: $('buscarVehiculo').value.trim(),
+    limit,
+    offset: (paginator.currentPage - 1) * limit,
+  });
+  vehiculos = page.rows;
+  totalVehiculos = page.total;
   render();
 }
 
@@ -141,8 +177,8 @@ const refreshAdminDelete = bindAdminDelete({
 
 $('btnNuevoVehiculo').addEventListener('click', () => abrirFormulario(null));
 $('btnCancelarVehiculo').addEventListener('click', cerrarFormulario);
-$('buscarVehiculo').addEventListener('input', render);
-$('filtroEstado').addEventListener('change', render);
+$('buscarVehiculo').addEventListener('input', () => { recargar({ reset: true }); });
+$('filtroEstado').addEventListener('change', () => { recargar({ reset: true }); });
 $('toastClose')?.addEventListener('click', () => $('toastNotification').classList.add('hidden'));
 $('btnCerrarDetalleVehiculo')?.addEventListener('click', () => $('modalDetalleVehiculo').classList.add('hidden'));
 

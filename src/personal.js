@@ -11,10 +11,11 @@
 
 import {
   initDatabase,
-  getAllPersonal,
   savePersonal,
   deletePersonal,
   getFullName,
+  listPersonalPage,
+  resumenPersonal,
 } from './db.js';
 
 import {
@@ -53,8 +54,9 @@ const esc = (s) =>
     '"': '&quot;',
   }[c]));
 
-let allPersonal = [];
+let resumen = { total: 0, activos: 0, inactivos: 0 };
 let lastFilteredPersonal = [];
+let cargaToken = 0;
 let editingId = null;
 let refreshAdminDelete = () => {};
 let deletingId = null;
@@ -62,7 +64,7 @@ let toastTimeout = null;
 
 const paginator = new TablePaginator({
   containerId: 'tablePagination',
-  onPageChange: () => renderTable(lastFilteredPersonal),
+  onPageChange: () => { cargarPersonal(); },
   storageKey: 'paginator_personal',
 });
 
@@ -134,22 +136,21 @@ $('toastClose')?.addEventListener('click', () => {
 /* --------------------------------------------------------------------------
    Renderizado de la Tabla de Personal
    -------------------------------------------------------------------------- */
-function renderTable(personalList) {
+function renderTable(personalList, meta = {}) {
   const tbody = $('personalTableBody');
   if (!tbody) return;
 
   lastFilteredPersonal = personalList;
+  const pageData = meta.paged ? personalList : paginator.getCurrentSlice(personalList);
+  const totalFiltrado = meta.paged ? meta.total : personalList.length;
 
-  // Actualizar contadores
-  const total = allPersonal.length;
-  const activos = allPersonal.filter((p) => (p.estatus || 'Activo') === 'Activo').length;
-  const inactivos = total - activos;
+  const total = resumen.total;
+  const activos = resumen.activos;
+  const inactivos = resumen.inactivos;
 
   if ($('lblTotal')) $('lblTotal').textContent = total;
   if ($('lblActivos')) $('lblActivos').textContent = activos;
   if ($('lblInactivos')) $('lblInactivos').textContent = inactivos;
-
-  const pageData = paginator.getCurrentSlice(personalList);
 
   if (pageData.length === 0) {
     const hasQuery = ($('searchInput')?.value || '').trim();
@@ -169,7 +170,7 @@ function renderTable(personalList) {
         </td>
       </tr>
     `;
-    paginator.update(personalList.length);
+    paginator.update(totalFiltrado);
     return;
   }
 
@@ -212,34 +213,32 @@ function renderTable(personalList) {
     btn.onclick = () => openModalEliminar(btn.dataset.eliminar);
   });
 
-  paginator.update(personalList.length);
+  paginator.update(totalFiltrado);
 }
 
 /* --------------------------------------------------------------------------
    Filtros y Búsqueda en Tiempo Real
    -------------------------------------------------------------------------- */
-function applyFilterAndRender() {
-  const query = ($('searchInput')?.value || '').trim().toLowerCase();
-  const filtro = $('filterEstatus')?.value || 'Activo';
-
-  let filtered = allPersonal.filter((p) => {
-    const est = p.estatus || 'Activo';
-    if (filtro === 'todos') return true;
-    return est === filtro;
-  });
-
-  if (query) {
-    filtered = filtered.filter((p) => {
-      const full = getFullName(p).toLowerCase();
-      const cargo = (p.cargo || '').toLowerCase();
-      const numT = (p.numero_trabajador || '').toLowerCase();
-      const numC = (p.numero_checador_digital || '').toLowerCase();
-      return full.includes(query) || cargo.includes(query) || numT.includes(query) || numC.includes(query);
-    });
+async function cargarPersonal({ reset = false, conResumen = false } = {}) {
+  if (reset) paginator.resetPage();
+  const token = ++cargaToken;
+  const limit = paginator.getRowsPerPage();
+  const offset = (paginator.currentPage - 1) * limit;
+  const texto = ($('searchInput')?.value || '').trim();
+  const estatus = $('filterEstatus')?.value || 'Activo';
+  try {
+    const page = await listPersonalPage({ estatus, texto, limit, offset });
+    if (conResumen) resumen = await resumenPersonal();
+    if (token !== cargaToken) return;
+    lastFilteredPersonal = page.rows;
+    renderTable(page.rows, { paged: true, total: page.total });
+  } catch (err) {
+    console.error('Error al cargar personal:', err);
   }
+}
 
-  paginator.resetPage();
-  renderTable(filtered);
+function applyFilterAndRender() {
+  cargarPersonal({ reset: true, conResumen: true });
 }
 
 /* --------------------------------------------------------------------------
@@ -254,7 +253,7 @@ function openModalPersonal(id = null) {
   editingId = id;
 
   if (id) {
-    const p = allPersonal.find((item) => item.id === id);
+    const p = lastFilteredPersonal.find((item) => item.id === id);
     if (!p) return;
     if (title) title.textContent = 'Editar Trabajador';
     $('nombres').value = p.nombres || '';
@@ -283,7 +282,7 @@ function closeModalPersonal() {
 }
 
 function openDetallePersonal(id) {
-  const p = allPersonal.find((item) => item.id === id);
+  const p = lastFilteredPersonal.find((item) => item.id === id);
   if (!p) return;
   const content = $('modalDetallePersonalContent');
   if (content) {
@@ -311,7 +310,7 @@ refreshAdminDelete = bindAdminDelete({
   getId: () => editingId,
   removeLocal: (id) => deletePersonal(id),
   after: () => {
-    allPersonal = allPersonal.filter((p) => p.id !== editingId);
+    lastFilteredPersonal = lastFilteredPersonal.filter((p) => p.id !== editingId);
     closeModalPersonal();
     applyFilterAndRender();
   },
@@ -322,7 +321,7 @@ refreshAdminDelete = bindAdminDelete({
    -------------------------------------------------------------------------- */
 function openModalEliminar(id) {
   deletingId = id;
-  const p = allPersonal.find((item) => item.id === id);
+  const p = lastFilteredPersonal.find((item) => item.id === id);
   const nombre = p ? getFullName(p) : 'este trabajador';
   if ($('modalEliminarTexto')) {
     $('modalEliminarTexto').textContent = `¿Deseas eliminar a "${nombre}" de la plantilla?`;
@@ -343,7 +342,7 @@ async function confirmEliminar() {
   try {
     await deletePersonal(id);
     const sheet = await unlinkFromSheets('personal', id);
-    allPersonal = allPersonal.filter((p) => p.id !== id);
+    lastFilteredPersonal = lastFilteredPersonal.filter((p) => p.id !== id);
     const extra = sheet.removed ? ' También se borró de Google Sheets.' : (sheet.linked && sheet.error ? ' No se pudo borrar de Google Sheets.' : '');
     showToast('success', `Trabajador eliminado correctamente.${extra}`);
     applyFilterAndRender();
@@ -376,11 +375,11 @@ $('formPersonal')?.addEventListener('submit', async (e) => {
   try {
     const saved = await savePersonal(data);
     if (editingId) {
-      const idx = allPersonal.findIndex((p) => p.id === editingId);
-      if (idx >= 0) allPersonal[idx] = { ...allPersonal[idx], ...saved };
+      const idx = lastFilteredPersonal.findIndex((p) => p.id === editingId);
+      if (idx >= 0) lastFilteredPersonal[idx] = { ...lastFilteredPersonal[idx], ...saved };
       showToast('success', 'Trabajador actualizado correctamente.');
     } else {
-      allPersonal.unshift(saved);
+      lastFilteredPersonal.unshift(saved);
       showToast('success', 'Trabajador guardado en la base de datos.');
     }
 
@@ -483,15 +482,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.warn('Error al conectar base de datos:', err);
   }
 
-  try {
-    allPersonal = await getAllPersonal();
-    console.info('[personal] getAllPersonal OK — registros:', allPersonal.length, allPersonal.map(p => p.nombres));
-  } catch (err) {
-    console.error('Error al cargar personal:', err);
-    allPersonal = [];
-  }
-
-  applyFilterAndRender();
+  await cargarPersonal({ conResumen: true });
   attachInputNormalizers(document);
 
   $('searchInput')?.addEventListener('input', applyFilterAndRender);

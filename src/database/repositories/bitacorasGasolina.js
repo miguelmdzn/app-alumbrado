@@ -12,6 +12,7 @@ import {
   idbClear,
   generateUUID,
 } from '../core.js';
+import { queryPage, likeParam, sqlLike } from '../page.js';
 
 const TABLE = 'bitacoras_gasolina';
 
@@ -185,4 +186,65 @@ export async function deleteBitacoraGasolina(id) {
     await getSQLite().execute(`DELETE FROM ${TABLE} WHERE id = $1;`, [id]);
   }
   await idbDelete(TABLE, id);
+}
+
+const CAMPOS_BITACORA = ['b.numero_ticket', 'v.placas', 'v.numero_serie', 'b.lugar_comision', 'b.observaciones', 'v.marca', 'b.fecha_ticket'];
+
+export async function listBitacorasPage({ texto = '', limit = 10, offset = 0 } = {}) {
+  const like = texto.trim() ? likeParam(texto) : '';
+  const q = texto.trim().toLowerCase();
+  return queryPage({
+    fromSql: `${TABLE} b JOIN vehiculos v ON v.id = b.vehiculo_id`,
+    selectSql: `
+      b.id, b.fecha_ticket, b.numero_ticket, b.lugar_comision, b.litros, b.importe,
+      b.km_anterior, b.km_actual, b.nivel_antes_cargar, b.nivel_despues_carga,
+      b.vehiculo_id, b.observaciones, b.created_at, b.updated_at,
+      v.placas, v.marca, v.modelo, v.anio, v.descripcion, v.num_resguardo,
+      v.responsable_bien, v.numero_serie, v.estado AS vehiculo_estado`,
+    whereSql: `($1 = '' OR ${sqlLike(CAMPOS_BITACORA, 2)})`,
+    params: [like ? '1' : '', ...CAMPOS_BITACORA.map(() => like || '%')],
+    orderSql: 'b.fecha_ticket ASC, b.created_at ASC',
+    extraSql: 'COALESCE(SUM(b.litros), 0) AS litros, COALESCE(SUM(b.importe), 0) AS importe',
+    limit,
+    offset,
+    idbAll: async () => {
+      const cargas = await idbGetAll(TABLE);
+      const vehiculos = await idbGetAll('vehiculos');
+      const porId = new Map(vehiculos.map((v) => [v.id, v]));
+      return cargas.map((row) => ({ ...porId.get(row.vehiculo_id), ...row, vehiculo_estado: porId.get(row.vehiculo_id)?.estado }));
+    },
+    idbFilter: (row) => {
+      if (!q) return true;
+      return [row.numero_ticket, row.placas, row.numero_serie, row.lugar_comision, row.observaciones, row.marca, row.fecha_ticket]
+        .some((v) => String(v || '').toLowerCase().includes(q));
+    },
+    idbCompare: (a, b) => String(a.fecha_ticket || '').localeCompare(String(b.fecha_ticket || '')),
+    idbStats: (list) => ({
+      litros: list.reduce((acc, row) => acc + (Number(row.litros) || 0), 0),
+      importe: list.reduce((acc, row) => acc + (Number(row.importe) || 0), 0),
+    }),
+  });
+}
+
+export async function ultimasCargasVehiculo(vehiculoId, limite = 2) {
+  if (!vehiculoId) return [];
+  const n = Math.max(1, Math.floor(Number(limite) || 2));
+  if (isSQLiteReady()) {
+    try {
+      const rows = await getSQLite().select(
+        `${SELECT_JOIN}
+         WHERE b.vehiculo_id = $1
+         ORDER BY b.fecha_ticket DESC, b.created_at DESC
+         LIMIT ${n};`,
+        [vehiculoId]
+      );
+      if (Array.isArray(rows)) return rows;
+    } catch (err) {
+      console.error('[bitacoras] últimas cargas:', err);
+    }
+  }
+  const rows = await getBitacorasGasolina({ vehiculoId });
+  return rows
+    .sort((a, b) => String(b.fecha_ticket || '').localeCompare(String(a.fecha_ticket || '')))
+    .slice(0, n);
 }

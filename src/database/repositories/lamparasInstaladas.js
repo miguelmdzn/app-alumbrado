@@ -15,6 +15,7 @@ import {
   idbClear,
   generateUUID,
 } from '../core.js';
+import { queryPage, likeParam, sqlLike } from '../page.js';
 
 const TABLE = 'lamparas_instaladas';
 
@@ -135,5 +136,28 @@ export async function deleteLamparaInstalada(id) {
 
   await idbDelete(TABLE, id);
   return true;
+}
+
+const CAMPOS_LAMPARA = ['folio', 'tipo_lampara', 'ubicacion', 'personal_instalo'];
+
+export async function listLamparasPage({ texto = '', idsPersonal = [], limit = 10, offset = 0 } = {}) {
+  const like = texto.trim() ? likeParam(texto) : '';
+  const q = texto.trim().toLowerCase();
+  const extras = idsPersonal.map((_, i) => `OR IFNULL(personal_instalo, '') LIKE $${CAMPOS_LAMPARA.length + 2 + i}`);
+  return queryPage({
+    fromSql: TABLE,
+    whereSql: `($1 = '' OR ${sqlLike(CAMPOS_LAMPARA, 2)} ${extras.join(' ')})`,
+    params: [like ? '1' : '', ...CAMPOS_LAMPARA.map(() => like || '%'), ...idsPersonal.map((id) => `%${id}%`)],
+    orderSql: 'fecha DESC, created_at DESC',
+    limit,
+    offset,
+    idbAll: () => idbGetAll(TABLE),
+    idbFilter: (r) => {
+      if (!q) return true;
+      if (CAMPOS_LAMPARA.some((campo) => String(r[campo] || '').toLowerCase().includes(q))) return true;
+      return idsPersonal.some((id) => String(r.personal_instalo || '').includes(id));
+    },
+    idbCompare: (a, b) => String((b.fecha || '') + (b.created_at || '')).localeCompare(String((a.fecha || '') + (a.created_at || ''))),
+  });
 }
 

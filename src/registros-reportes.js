@@ -19,6 +19,10 @@ import {
   estatusPorDiasHabiles,
   getAllSolicitudesLamparas,
   getAtencionesParaImpresion,
+  listReportesPage,
+  listReportesMatching,
+  resumenReportes,
+  listSolicitudesPage,
 } from './db.js';
 
 import { attachInputNormalizers } from './normalizer.js';
@@ -41,6 +45,8 @@ const esc = (s) =>
 const fd = (s) => (s ? s.split('-').reverse().join('/') : '');
 
 let allReportes = [];
+let kpiReportes = { total: 0, atendidos: 0 };
+let cargaToken = 0;
 let atencionesPorFolio = new Map();
 let pendingAttendId = null;
 let detalleReporteId = null;
@@ -59,11 +65,12 @@ let busquedaMensajeVacio = '';
 const paginator = new TablePaginator({
   containerId: 'tablePagination',
   onPageChange: () => {
-    if (vistaActual === 'solicitudes') {
-      renderSolicitudesTable(allSolicitudes);
-    } else {
-      renderTable(lastFilteredReportes);
+    if (busquedaAvanzadaActiva) {
+      if (vistaActual === 'solicitudes') renderSolicitudesTable(allSolicitudes);
+      else renderTable(lastFilteredReportes);
+      return;
     }
+    cargarListado();
   },
   storageKey: 'paginator_reportes',
   overflowAllowance: 88,
@@ -172,7 +179,7 @@ function closeOpcionesModal() {
 }
 
 function atencionesUrl(page) {
-  const r = allReportes.find((item) => item.id === detalleReporteId);
+  const r = reportePorId(detalleReporteId);
   if (!r) return null;
   const query = new URLSearchParams({
     folio: r.folio || '',
@@ -183,7 +190,7 @@ function atencionesUrl(page) {
 
 function openDetalleModal(id) {
   detalleReporteId = id;
-  const r = allReportes.find((item) => item.id === id);
+  const r = reportePorId(id);
   if (!r) return;
 
   const content = $('modalDetalleContent');
@@ -273,13 +280,15 @@ async function finalizarSoloTerminado() {
   closeOpcionesModal();
   if (!id) return;
 
-  const reporte = allReportes.find((r) => r.id === id);
+  const reporte = reportePorId(id);
   if (!reporte) return;
 
   try {
     const saved = await saveReporte({ ...reporte, estatus: 'Atendido' });
     const index = allReportes.findIndex((r) => r.id === id);
     if (index >= 0) allReportes[index] = { ...allReportes[index], ...saved, estatus: 'Atendido' };
+    kpiReportes = await resumenReportes();
+    pintarTableroReportes();
     applyFilterAndRender();
   } catch (err) {
     console.error('Error al marcar reporte como atendido:', err);
@@ -291,7 +300,7 @@ async function finalizarYAnadirEvidencia() {
   closeOpcionesModal();
   if (!id) return;
 
-  const reporte = allReportes.find((r) => r.id === id);
+  const reporte = reportePorId(id);
   if (!reporte) return;
 
   try {
@@ -321,12 +330,21 @@ async function finalizarYAnadirEvidencia() {
 /* --------------------------------------------------------------------------
    VISTA DE PANTALLA: Tabla interactiva de registros
    -------------------------------------------------------------------------- */
-function renderTable(reportes) {
+function reportePorId(id) {
+  return lastFilteredReportes.find((item) => item.id === id)
+    || allReportes.find((item) => item.id === id)
+    || null;
+}
+
+function renderTable(reportes, meta = {}) {
   const tbody = $('reportesTableBody');
   if (!tbody) return;
 
   lastFilteredReportes = reportes;
-  const pageData = paginator.getCurrentSlice(reportes);
+  const pageData = meta.paged ? reportes : paginator.getCurrentSlice(reportes);
+  const totalLista = meta.paged ? meta.total : reportes.length;
+  if (meta.paged && $('lblLamparas')) $('lblLamparas').textContent = String(meta.lamparas ?? 0);
+  if (meta.paged && $('lblTotal')) $('lblTotal').textContent = String(totalLista);
   const filtro = $('filterEstatus')?.value || 'sin_atender';
 
   if (pageData.length === 0) {
@@ -345,7 +363,7 @@ function renderTable(reportes) {
         </td>
       </tr>
     `;
-    paginator.update(reportes.length);
+    paginator.update(totalLista);
     return;
   }
 
@@ -359,13 +377,15 @@ function renderTable(reportes) {
       ? `<button type="button" class="btn-icon-action btn-icon-action-check" data-atender="${esc(r.id)}" title="Marcar como atendido" aria-label="Marcar como atendido">${CHECK_ICON}</button>`
       : '';
 
+    const folioTxt = r.folio || 'S/F';
+    const folioClass = String(folioTxt).trim().toUpperCase() === 'S/F' ? 'folio-pill is-sf' : 'folio-pill';
     const nota = r._busquedaNota
       ? `<tr class="busqueda-nota-row"><td colspan="7">${esc(r._busquedaNota)}</td></tr>`
       : '';
 
     return `
       <tr>
-        <td class="td-folio">${esc(r.folio || 'S/F')}</td>
+        <td class="td-folio"><span class="${folioClass}">${esc(folioTxt)}</span></td>
         <td class="td-datetime">${fechaFmt}</td>
         
         <td class="td-clip" title="${esc(r.usuario || '')}"><strong>${esc(r.usuario || '—')}</strong></td>
@@ -393,7 +413,7 @@ function renderTable(reportes) {
     btn.onclick = () => openAttendModal(btn.dataset.atender);
   });
 
-  paginator.update(reportes.length);
+  paginator.update(totalLista);
 }
 
 /* --------------------------------------------------------------------------
@@ -803,9 +823,18 @@ function renderPrintDocument(reportes, options = {}) {
   container.innerHTML = sectionsHtml;
 }
 
-function getReportesParaExportar() {
-  if (vistaActual === 'reportes') return lastFilteredReportes.slice();
-  return allReportes.slice();
+async function getReportesParaExportar() {
+  if (!atencionesPorFolio || atencionesPorFolio.size === 0) {
+    try { atencionesPorFolio = await getAtencionesParaImpresion(); } catch { atencionesPorFolio = new Map(); }
+  }
+  if (vistaActual !== 'reportes') {
+    if (!allReportes.length) allReportes = await getAllReportes();
+    return allReportes.slice();
+  }
+  if (busquedaAvanzadaActiva) return lastFilteredReportes.slice();
+  const texto = ($('searchInput')?.value || '').trim();
+  const estatus = $('filterEstatus')?.value || 'sin_atender';
+  return listReportesMatching({ estatus, texto });
 }
 
 function reporteExportId(reporte) {
@@ -876,8 +905,8 @@ function renderExportFolioList() {
   updateExportFolioCount();
 }
 
-function openExportFoliosStep() {
-  exportFolioSource = getReportesParaExportar();
+async function openExportFoliosStep() {
+  exportFolioSource = await getReportesParaExportar();
   exportFolioSelected = new Set();
   if ($('exportFolioBuscar')) $('exportFolioBuscar').value = '';
   $('exportFolioError')?.classList.add('hidden');
@@ -908,9 +937,9 @@ function imprimirReportes(reportes, includeSolicitudes) {
   setTimeout(() => window.print(), 50);
 }
 
-function exportarTodosLosReportes() {
+async function exportarTodosLosReportes() {
   closeExportPdfModal();
-  imprimirReportes(getReportesParaExportar(), true);
+  imprimirReportes(await getReportesParaExportar(), true);
 }
 
 function exportarFoliosSeleccionados() {
@@ -933,11 +962,12 @@ const PENCIL_SOL_ICON = `
   </svg>
 `;
 
-function renderSolicitudesTable(lista) {
+function renderSolicitudesTable(lista, meta = {}) {
   const tbody = $('solicitudesTableBody');
   if (!tbody) return;
 
-  const pageData = paginator.getCurrentSlice(lista);
+  const pageData = meta.paged ? lista : paginator.getCurrentSlice(lista);
+  const totalLista = meta.paged ? meta.total : lista.length;
 
   if (pageData.length === 0) {
     const hasQuery = ($('searchInput')?.value || '').trim();
@@ -948,7 +978,7 @@ function renderSolicitudesTable(lista) {
         </td>
       </tr>
     `;
-    paginator.update(lista.length);
+    paginator.update(totalLista);
     return;
   }
 
@@ -984,7 +1014,7 @@ function renderSolicitudesTable(lista) {
     btn.onclick = () => openDetalleSolicitud(btn.dataset.detalleSol);
   });
 
-  paginator.update(lista.length);
+  paginator.update(totalLista);
 }
 
 function openDetalleSolicitud(id) {
@@ -1015,6 +1045,13 @@ function openDetalleSolicitud(id) {
 /* --------------------------------------------------------------------------
    ALTERNAR ENTRE VISTA DE REPORTES Y SOLICITUDES
    -------------------------------------------------------------------------- */
+function pintarTableroReportes() {
+  const atendidos = kpiReportes.atendidos;
+  if ($('lblKpiTotal')) $('lblKpiTotal').textContent = String(kpiReportes.total);
+  if ($('lblAtendidos')) $('lblAtendidos').textContent = String(atendidos);
+  if ($('lblPendientes')) $('lblPendientes').textContent = String(Math.max(0, kpiReportes.total - atendidos));
+}
+
 function activarVistaReportes() {
   vistaActual = 'reportes';
 
@@ -1028,8 +1065,10 @@ function activarVistaReportes() {
 
   const lbl = $('lblToggleVista');
   if (lbl) lbl.textContent = 'Solicitudes';
-  if ($('pageViewTitle')) $('pageViewTitle').textContent = 'REGISTRO DE REPORTES';
-  if ($('pageViewDesc')) $('pageViewDesc').textContent = 'Consulta e impresión de reportes de fallas de Alumbrado Público.';
+  if ($('pageViewTitle')) $('pageViewTitle').textContent = 'Registro de Reportes';
+  if ($('pageViewDesc')) $('pageViewDesc').textContent = 'Consulta y administra los reportes de alumbrado público';
+  $('dashKpis')?.classList.remove('hidden');
+  pintarTableroReportes();
 
   paginator.resetPage();
   applyFilterAndRender();
@@ -1048,58 +1087,54 @@ async function activarVistaSolicitudes() {
 
   const lbl = $('lblToggleVista');
   if (lbl) lbl.textContent = 'Reportes';
-  if ($('pageViewTitle')) $('pageViewTitle').textContent = 'SOLICITUDES DE INSTALACIÓN DE LÁMPARAS';
+  if ($('pageViewTitle')) $('pageViewTitle').textContent = 'Solicitudes de instalación de lámparas';
   if ($('pageViewDesc')) $('pageViewDesc').textContent = 'Consulta de solicitudes de instalación de nuevas lámparas.';
+  $('dashKpis')?.classList.add('hidden');
 
   if ($('lblTotal')) $('lblTotal').textContent = '...';
-
-  try {
-    allSolicitudes = await getAllSolicitudesLamparas();
-  } catch (err) {
-    console.error('[solicitudes] Error al cargar:', err);
-    allSolicitudes = [];
-  }
-
-  // Búsqueda en tiempo real sobre solicitudes
-  const query = ($('searchInput')?.value || '').trim().toLowerCase();
-  let lista = allSolicitudes;
-  if (query) {
-    lista = allSolicitudes.filter((s) =>
-      [s.nombre_solicitante, s.tipo_localidad, s.descripcion, s.observaciones, s.estatus]
-        .some((v) => (v || '').toLowerCase().includes(query))
-    );
-  }
-
-  if ($('lblTotal')) $('lblTotal').textContent = lista.length;
-
-  paginator.resetPage();
-  renderSolicitudesTable(lista);
-  // Regenerar vista de impresión con solicitudes arriba
-  renderPrintDocument(allReportes);
+  await cargarListado({ reset: true });
 }
 
 /* --------------------------------------------------------------------------
    Filtros y búsqueda en tiempo real
    -------------------------------------------------------------------------- */
-function applyFilterAndRender() {
-  const query = ($('searchInput')?.value || '').trim().toLowerCase();
-
-  // Si estamos viendo solicitudes, filtrar y renderizar solicitudes
-  if (vistaActual === 'solicitudes') {
-    let lista = allSolicitudes;
-    if (query) {
-      lista = allSolicitudes.filter((s) =>
-        [s.nombre_solicitante, s.tipo_localidad, s.descripcion, s.observaciones, s.estatus]
-          .some((v) => (v || '').toLowerCase().includes(query))
-      );
+async function cargarListado({ reset = false } = {}) {
+  if (reset) paginator.resetPage();
+  const token = ++cargaToken;
+  const limit = paginator.getRowsPerPage();
+  const offset = (paginator.currentPage - 1) * limit;
+  const texto = ($('searchInput')?.value || '').trim();
+  try {
+    if (vistaActual === 'solicitudes') {
+      const page = await listSolicitudesPage({ texto, limit, offset });
+      if (token !== cargaToken) return;
+      if ($('lblTotal')) $('lblTotal').textContent = page.total;
+      renderSolicitudesTable(page.rows, { paged: true, total: page.total });
+      return;
     }
-    if ($('lblTotal')) $('lblTotal').textContent = lista.length;
-    paginator.resetPage();
-    renderSolicitudesTable(lista);
+    const estatus = $('filterEstatus')?.value || 'sin_atender';
+    const page = await listReportesPage({ estatus, texto, limit, offset });
+    if (token !== cargaToken) return;
+    renderTable(page.rows, {
+      paged: true,
+      total: page.total,
+      lamparas: Number(page.stats?.lamparas || 0),
+    });
+  } catch (err) {
+    console.error('Error al cargar la página:', err);
+  }
+}
+
+function applyFilterAndRender() {
+  if (busquedaAvanzadaActiva && vistaActual !== 'solicitudes') {
+    filtrarReportesEnMemoria();
     return;
   }
+  cargarListado({ reset: true });
+}
 
-  // Vista de reportes
+function filtrarReportesEnMemoria() {
+  const query = ($('searchInput')?.value || '').trim().toLowerCase();
   const filtro = $('filterEstatus')?.value || 'sin_atender';
 
   let filtered = allReportes;
@@ -1133,6 +1168,7 @@ function applyFilterAndRender() {
   paginator.resetPage();
   renderTable(filtered);
   renderPrintDocument(filtered);
+  pintarTableroReportes();
 }
 
 /* --------------------------------------------------------------------------
@@ -1225,30 +1261,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    allReportes = await getAllReportes();
-    atencionesPorFolio = await getAtencionesParaImpresion();
+    kpiReportes = await resumenReportes();
   } catch (err) {
-    console.error('Error al cargar reportes:', err);
-    allReportes = [];
-    atencionesPorFolio = new Map();
+    console.error('Error al contar reportes:', err);
+    kpiReportes = { total: 0, atendidos: 0 };
   }
-
-  // Pre-cargar solicitudes de instalación para estadísticas y vista de impresión
-  try {
-    allSolicitudes = await getAllSolicitudesLamparas();
-  } catch (err) {
-    console.warn('Error al cargar solicitudes iniciales:', err);
-    allSolicitudes = [];
-  }
-
-  // Ordenar por estricta jerarquía de estatus para la pantalla:
-  // 1) Otro (mayor jerarquía)
-  // 2) Urgente
-  // 3) Pendiente
-  // 4) En espera (hasta el final)
-  sortReportesByHierarchy(allReportes);
-
-  applyFilterAndRender();
+  pintarTableroReportes();
+  await cargarListado();
   attachInputNormalizers(document);
 
   $('searchInput')?.addEventListener('input', applyFilterAndRender);
@@ -1271,7 +1290,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     if ($('filterEstatus')) $('filterEstatus').style.display = '';
     if ($('pillLamparas')) $('pillLamparas').style.display = '';
     if ($('lblToggleVista')) $('lblToggleVista').textContent = 'Solicitudes';
-    if ($('pageViewTitle')) $('pageViewTitle').textContent = 'REGISTRO DE REPORTES';
+    if ($('pageViewTitle')) $('pageViewTitle').textContent = 'Registro de Reportes';
+    pintarTableroReportes();
   };
 
   $('btnBusquedaAvanzada')?.addEventListener('click', () => {
@@ -1301,6 +1321,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     const btn = $('btnAplicarBusquedaAvanzada');
     if (btn) btn.disabled = true;
     mostrarReportes();
+    if (!allReportes.length) {
+      try { allReportes = await getAllReportes(); } catch { allReportes = []; }
+    }
+    if (!atencionesPorFolio || atencionesPorFolio.size === 0) {
+      try { atencionesPorFolio = await getAtencionesParaImpresion(); } catch { atencionesPorFolio = new Map(); }
+    }
     busquedaAvanzadaActiva = true;
     ordenBusqueda = [];
     notasBusqueda = new Map();

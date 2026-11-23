@@ -11,8 +11,10 @@
 
 import {
   initDatabase,
-  getAllDiasInhabiles,
+  getDiaInhabilById,
   saveDiaInhabil,
+  listDiasPage,
+  resumenDiasInhabiles,
   deleteDiaInhabil,
   syncOfficialHolidays,
 } from './db.js';
@@ -60,6 +62,8 @@ function formatFechaLarga(fechaIso) {
 }
 
 let allDias = [];
+let resumenDias = { total: 0, oficiales: 0, municipales: 0, activos: 0, years: [] };
+let cargaDias = 0;
 let lastFilteredDias = [];
 let editingId = null;
 let refreshAdminDelete = () => {};
@@ -68,7 +72,7 @@ let toastTimeout = null;
 
 const paginator = new TablePaginator({
   containerId: 'tablePagination',
-  onPageChange: () => renderTable(lastFilteredDias),
+  onPageChange: () => { cargarDias(); },
   storageKey: 'paginator_dias',
 });
 
@@ -140,24 +144,25 @@ $('toastClose')?.addEventListener('click', () => {
 /* --------------------------------------------------------------------------
    Renderizado de la Tabla de Días Inhábiles
    -------------------------------------------------------------------------- */
-function renderTable(diasList) {
+function renderTable(diasList, meta = {}) {
   const tbody = $('diasTableBody');
   if (!tbody) return;
 
   lastFilteredDias = diasList;
+  const pageData = meta.paged ? diasList : paginator.getCurrentSlice(diasList);
+  const totalLista = meta.paged ? meta.total : diasList.length;
 
   // Actualizar estadísticas globales
-  const total = allDias.length;
-  const oficiales = allDias.filter((d) => (d.tipo || '').toLowerCase() === 'oficial').length;
-  const municipales = allDias.filter((d) => (d.tipo || '').toLowerCase() === 'municipal').length;
-  const activos = allDias.filter((d) => d.activo === 1 || d.activo === true || d.activo === '1').length;
+  const total = resumenDias.total;
+  const oficiales = resumenDias.oficiales;
+  const municipales = resumenDias.municipales;
+  const activos = resumenDias.activos;
 
   if ($('lblTotal')) $('lblTotal').textContent = total;
   if ($('lblOficiales')) $('lblOficiales').textContent = oficiales;
   if ($('lblMunicipales')) $('lblMunicipales').textContent = municipales;
   if ($('lblActivos')) $('lblActivos').textContent = activos;
 
-  const pageData = paginator.getCurrentSlice(diasList);
 
   if (pageData.length === 0) {
     const hasQuery = ($('searchInput')?.value || '').trim();
@@ -168,7 +173,7 @@ function renderTable(diasList) {
         </td>
       </tr>
     `;
-    paginator.update(diasList.length);
+    paginator.update(totalLista);
     return;
   }
 
@@ -220,52 +225,36 @@ function renderTable(diasList) {
     btn.onclick = () => openModalEliminar(btn.dataset.eliminar);
   });
 
-  paginator.update(diasList.length);
+  paginator.update(totalLista);
 }
 
 /* --------------------------------------------------------------------------
    Filtros y Búsqueda en Tiempo Real
    -------------------------------------------------------------------------- */
+async function cargarDias({ reset = false } = {}) {
+  if (reset) paginator.resetPage();
+  const token = ++cargaDias;
+  const limit = paginator.getRowsPerPage();
+  const offset = (paginator.currentPage - 1) * limit;
+  try {
+    const page = await listDiasPage({
+      year: $('filterYear')?.value || 'todos',
+      tipo: $('filterTipo')?.value || 'todos',
+      activo: $('filterActivo')?.value || '1',
+      texto: ($('searchInput')?.value || '').trim(),
+      limit,
+      offset,
+    });
+    if (token !== cargaDias) return;
+    allDias = page.rows;
+    renderTable(page.rows, { paged: true, total: page.total });
+  } catch (err) {
+    console.error('Error al consultar días inhábiles:', err);
+  }
+}
+
 function applyFilterAndRender() {
-  const query = ($('searchInput')?.value || '').trim().toLowerCase();
-  const filterYear = $('filterYear')?.value || 'todos';
-  const filterTipo = $('filterTipo')?.value || 'todos';
-  const filterActivo = $('filterActivo')?.value || '1';
-
-  let filtered = [...allDias];
-
-  // Filtro por año
-  if (filterYear !== 'todos') {
-    filtered = filtered.filter((d) => String(d.year) === String(filterYear));
-  }
-
-  // Filtro por tipo
-  if (filterTipo !== 'todos') {
-    filtered = filtered.filter((d) => (d.tipo || '').toLowerCase() === filterTipo.toLowerCase());
-  }
-
-  // Filtro por estatus activo / inactivo
-  if (filterActivo !== 'todos') {
-    const wantActivo = filterActivo === '1';
-    filtered = filtered.filter((d) => {
-      const isActivo = d.activo === 1 || d.activo === true || d.activo === '1';
-      return isActivo === wantActivo;
-    });
-  }
-
-  // Búsqueda libre
-  if (query) {
-    filtered = filtered.filter((d) => {
-      const desc = (d.descripcion || '').toLowerCase();
-      const fecha = (d.fecha || '').toLowerCase();
-      const tipo = (d.tipo || '').toLowerCase();
-      const year = String(d.year || '');
-      return desc.includes(query) || fecha.includes(query) || tipo.includes(query) || year.includes(query);
-    });
-  }
-
-  paginator.resetPage();
-  renderTable(filtered);
+  cargarDias({ reset: true });
 }
 
 function updateYearFilterOptions() {
@@ -276,9 +265,7 @@ function updateYearFilterOptions() {
   const currentYear = new Date().getFullYear();
   const yearsSet = new Set([currentYear - 1, currentYear, currentYear + 1]);
 
-  allDias.forEach((d) => {
-    if (d.year) yearsSet.add(Number(d.year));
-  });
+  (resumenDias.years || []).forEach((year) => yearsSet.add(Number(year)));
 
   const sortedYears = Array.from(yearsSet).sort((a, b) => b - a);
 
@@ -511,14 +498,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Cargar todos los días inhábiles
   try {
-    allDias = await getAllDiasInhabiles();
+    resumenDias = await resumenDiasInhabiles();
   } catch (err) {
     console.error('Error al consultar días inhábiles:', err);
-    allDias = [];
   }
-
   updateYearFilterOptions();
-  applyFilterAndRender();
+  await cargarDias();
   attachInputNormalizers(document);
 
   // Filtros interactivos

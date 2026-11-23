@@ -42,6 +42,8 @@ export {
   getEvidenciaById,
   deleteEvidencia,
   clearAllEvidencias,
+  listEvidenciasPage,
+  listEvidenciasMatching,
 } from './database/repositories/evidencias.js';
 
 // ---- Repositorio: config_bitacora (metadatos y configuración) -------------
@@ -67,6 +69,9 @@ export {
   getAllReportes,
   deleteReporte,
   getReporteById,
+  listReportesPage,
+  listReportesMatching,
+  resumenReportes,
 } from './database/repositories/reportes.js';
 
 // ---- Repositorio: personal (plantilla de trabajadores) ---------------------
@@ -76,6 +81,8 @@ export {
   deletePersonal,
   getPersonalById,
   getFullName,
+  listPersonalPage,
+  resumenPersonal,
 } from './database/repositories/personal.js';
 
 // ---- Repositorio: dias_inhabiles (feriados oficiales y asuetos municipales) -
@@ -84,6 +91,8 @@ export {
   getAllDiasInhabiles,
   getDiaInhabilById,
   deleteDiaInhabil,
+  listDiasPage,
+  resumenDiasInhabiles,
   syncOfficialHolidays,
   getActiveHolidaysSet,
   countBusinessDays,
@@ -97,11 +106,13 @@ export {
   getAllSolicitudesLamparas,
   getSolicitudLamparaById,
   deleteSolicitudLampara,
+  listSolicitudesPage,
 } from './database/repositories/solicitudesLamparas.js';
 
 // ---- Repositorio: localidades (colonias y comunidades del municipio) --------
 export {
   getAllLocalidades,
+  listLocalidadesPage,
   searchLocalidades,
   saveLocalidad,
   updateLocalidad,
@@ -115,6 +126,7 @@ export {
   getAllLamparasInstaladas,
   getLamparaInstaladaById,
   deleteLamparaInstalada,
+  listLamparasPage,
 } from './database/repositories/lamparasInstaladas.js';
 
 // ---- Repositorio: atenciones de un reporte (ligadas por folio) --------------
@@ -132,6 +144,7 @@ export {
   getAllVehiculos,
   getVehiculoById,
   deleteVehiculo,
+  listVehiculosPage,
 } from './database/repositories/vehiculos.js';
 
 // ---- Repositorio: bitácoras de combustible (no mueven el presupuesto) -------
@@ -140,4 +153,6 @@ export {
   getBitacorasGasolina,
   getBitacoraGasolinaById,
   deleteBitacoraGasolina,
+  listBitacorasPage,
+  ultimasCargasVehiculo,
 } from './database/repositories/bitacorasGasolina.js';

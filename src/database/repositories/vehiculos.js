@@ -12,6 +12,7 @@ import {
   idbClear,
   generateUUID,
 } from '../core.js';
+import { queryPage, likeParam, sqlLike } from '../page.js';
 
 const TABLE = 'vehiculos';
 
@@ -162,4 +163,31 @@ export async function deleteVehiculo(id) {
     if (row.vehiculo_id === id) await idbDelete('bitacoras_gasolina', row.id);
   }
   await idbDelete(TABLE, id);
+}
+
+const CAMPOS_VEHICULO = ['placas', 'numero_serie', 'marca', 'modelo', 'responsable_bien', 'num_resguardo', 'descripcion'];
+
+export async function listVehiculosPage({ estado = 'Activo', texto = '', limit = 10, offset = 0 } = {}) {
+  const like = texto.trim() ? likeParam(texto) : '';
+  const q = texto.trim().toLowerCase();
+  return queryPage({
+    fromSql: TABLE,
+    whereSql: `($1 = '' OR estado = $1) AND ($2 = '' OR ${sqlLike(CAMPOS_VEHICULO, 3)})`,
+    params: [estado || '', like ? '1' : '', ...CAMPOS_VEHICULO.map(() => like || '%')],
+    orderSql: `CASE WHEN estado = 'Activo' THEN 0 ELSE 1 END, placas COLLATE NOCASE, numero_serie COLLATE NOCASE`,
+    limit,
+    offset,
+    idbAll: () => idbGetAll(TABLE),
+    idbFilter: (v) => {
+      if (estado && v.estado !== estado) return false;
+      if (!q) return true;
+      return CAMPOS_VEHICULO.some((campo) => String(v[campo] || '').toLowerCase().includes(q));
+    },
+    idbCompare: (a, b) => {
+      const ea = a.estado === 'Activo' ? 0 : 1;
+      const eb = b.estado === 'Activo' ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      return String(a.placas || '').localeCompare(String(b.placas || ''), 'es');
+    },
+  });
 }

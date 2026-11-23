@@ -18,6 +18,7 @@ import {
   idbDelete,
   generateUUID,
 } from '../core.js';
+import { queryPage, likeParam, sqlLike } from '../page.js';
 
 const TABLE = 'dias_inhabiles';
 
@@ -367,6 +368,72 @@ export function countBusinessDays(startDateStr, endDateStr, holidaysSet = null) 
  * Estatus sugerido según los días hábiles transcurridos desde el reporte.
  * 0 a 4: En espera. 5 a 9: Pendiente. 10 o más: Urgente.
  */
+function diaActivo(d) {
+  return d.activo === 1 || d.activo === true || d.activo === '1';
+}
+
+export async function listDiasPage({ year = 'todos', tipo = 'todos', activo = '1', texto = '', limit = 10, offset = 0 } = {}) {
+  const like = texto.trim() ? likeParam(texto) : '';
+  const q = texto.trim().toLowerCase();
+  return queryPage({
+    fromSql: TABLE,
+    whereSql: `($1 = 'todos' OR year = $2)
+      AND ($3 = 'todos' OR lower(IFNULL(tipo, '')) = lower($3))
+      AND ($4 = 'todos' OR ($4 = '1' AND activo = 1) OR ($4 <> '1' AND $4 <> 'todos' AND IFNULL(activo, 0) <> 1))
+      AND ($5 = '' OR ${sqlLike(['descripcion', 'fecha', 'tipo', 'year'], 6)})`,
+    params: [year, Number(year) || 0, tipo, activo, like ? '1' : '', like || '%', like || '%', like || '%', like || '%'],
+    orderSql: 'fecha ASC, created_at ASC',
+    limit,
+    offset,
+    idbAll: () => idbGetAll(TABLE),
+    idbFilter: (d) => {
+      if (year !== 'todos' && String(d.year) !== String(year)) return false;
+      if (tipo !== 'todos' && String(d.tipo || '').toLowerCase() !== String(tipo).toLowerCase()) return false;
+      if (activo !== 'todos' && diaActivo(d) !== (activo === '1')) return false;
+      if (!q) return true;
+      return [d.descripcion, d.fecha, d.tipo, d.year].some((v) => String(v || '').toLowerCase().includes(q));
+    },
+    idbCompare: (a, b) => String(a.fecha || '').localeCompare(String(b.fecha || '')),
+  });
+}
+
+export async function resumenDiasInhabiles() {
+  const page = await queryPage({
+    fromSql: TABLE,
+    whereSql: '1=1',
+    params: [],
+    orderSql: 'fecha ASC',
+    limit: 1,
+    offset: 0,
+    extraSql: `SUM(CASE WHEN lower(IFNULL(tipo, '')) = 'oficial' THEN 1 ELSE 0 END) AS oficiales,
+      SUM(CASE WHEN lower(IFNULL(tipo, '')) = 'municipal' THEN 1 ELSE 0 END) AS municipales,
+      SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) AS activos`,
+    idbAll: () => idbGetAll(TABLE),
+    idbStats: (list) => ({
+      oficiales: list.filter((d) => String(d.tipo || '').toLowerCase() === 'oficial').length,
+      municipales: list.filter((d) => String(d.tipo || '').toLowerCase() === 'municipal').length,
+      activos: list.filter((d) => diaActivo(d)).length,
+      years: list.map((d) => Number(d.year)).filter(Boolean),
+    }),
+  });
+  let years = page.stats?.years || [];
+  if (isSQLiteReady() && !years.length) {
+    try {
+      const filas = await getSQLite().select(`SELECT DISTINCT year FROM ${TABLE} WHERE year IS NOT NULL;`);
+      years = (filas || []).map((f) => Number(f.year)).filter(Boolean);
+    } catch (err) {
+      console.error('[dias_inhabiles] años:', err);
+    }
+  }
+  return {
+    total: Number(page.total || 0),
+    oficiales: Number(page.stats?.oficiales || 0),
+    municipales: Number(page.stats?.municipales || 0),
+    activos: Number(page.stats?.activos || 0),
+    years,
+  };
+}
+
 export function estatusPorDiasHabiles(businessDays) {
   const days = Number(businessDays) || 0;
   if (days >= 10) return 'Urgente';

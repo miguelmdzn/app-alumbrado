@@ -317,16 +317,7 @@ export class TablePaginator {
       </div>
 
       <div class="pagination-controls">
-        <label class="pagination-auto-select-label" title="Filas visibles por página">
-          <span>Mostrar:</span>
-          <select class="pagination-rows-select" id="${this.containerId}_selectRows">
-            <option value="auto" ${this.mode === 'auto' ? 'selected' : ''}>Auto (${rpp})</option>
-            <option value="10" ${this.mode === 'fixed' && this.fixedRows === 10 ? 'selected' : ''}>10</option>
-            <option value="15" ${this.mode === 'fixed' && this.fixedRows === 15 ? 'selected' : ''}>15</option>
-            <option value="25" ${this.mode === 'fixed' && this.fixedRows === 25 ? 'selected' : ''}>25</option>
-            <option value="50" ${this.mode === 'fixed' && this.fixedRows === 50 ? 'selected' : ''}>50</option>
-          </select>
-        </label>
+        
 
         <button type="button" class="pagination-btn pagination-nav" id="${this.containerId}_prev" ${this.currentPage <= 1 ? 'disabled' : ''} title="Página anterior">
           ‹ Anterior
