@@ -102,33 +102,28 @@
     </div>
   </div>
 
-  <!-- ===== MODAL: Detalle de Lámpara ===== -->
-  <div class="modal-overlay hidden" id="modalDetalleLampara" role="dialog" aria-modal="true">
-    <div class="modal-panel modal-panel-lg">
-      <div class="modal-header">
-        <h3 class="modal-title">Detalle de instalación</h3>
-        <button type="button" class="modal-close" id="btnCerrarDetalleLamparaX" aria-label="Cerrar">&times;</button>
+  <!-- Modal: Ver detalle de la instalación -->
+  <div id="modalDetalleLampara" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalDetalleLamparaTitle">
+    <div class="modal-card modal-card-detail">
+      <div class="modal-header-row">
+        <h2 class="modal-title" id="modalDetalleLamparaTitle">Detalle de instalación</h2>
+        <button type="button" class="btn-close-modal" id="btnCerrarDetalleLamparaX" aria-label="Cerrar">&times;</button>
       </div>
-      <div class="modal-body" id="modalDetalleLamparaContent"></div>
-      <div class="modal-footer">
+      <div class="detail-grid" id="modalDetalleLamparaContent"></div>
+      <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="btnCerrarDetalleLampara">Cerrar</button>
       </div>
     </div>
   </div>
 
-  <!-- ===== MODAL: Confirmar eliminación ===== -->
-  <div class="modal-overlay hidden" id="modalEliminarLampara" role="dialog" aria-modal="true">
-    <div class="modal-panel modal-panel-sm">
-      <div class="modal-header">
-        <h3 class="modal-title">Eliminar registro</h3>
-        <button type="button" class="modal-close" id="btnEliminarLamparaNo" aria-label="Cerrar">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p>¿Estás seguro de que deseas eliminar este registro de instalación? Esta acción no se puede deshacer.</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-danger" id="btnEliminarLamparaSi">Sí, eliminar</button>
-        <button type="button" class="btn btn-secondary" id="btnEliminarLamparaNo2">Cancelar</button>
+  <!-- Modal: Confirmar eliminación -->
+  <div id="modalEliminarLampara" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalEliminarLamparaTitle">
+    <div class="modal-card">
+      <h2 class="modal-title" id="modalEliminarLamparaTitle">Confirmar eliminación</h2>
+      <p class="modal-text" id="modalEliminarLamparaTexto">¿Deseas eliminar este registro de instalación? Esta acción no se puede deshacer.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnEliminarLamparaNo">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-danger" id="btnEliminarLamparaSi">Eliminar</button>
       </div>
     </div>
   </div>

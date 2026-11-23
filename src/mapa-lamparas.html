@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de lámparas LED - Alumbrado Público</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.css">
+  <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.Default.css">
+  <script src="entrada-dia.js"></script>
+  <script src="search-guard.js" defer></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/markercluster/leaflet.markercluster.js"></script>
+  <script type="module" src="mapa-lamparas.js" defer></script>
+  <script type="module" src="admin-mode.js"></script>
+</head>
+
+<body>
+  <div class="app-shell">
+    <div id="appSidebarMount"></div>
+    <script src="sidebar.js"></script>
+
+    <div class="app-main-content">
+      <main class="app-container">
+        <header class="app-top-nav">
+          <div class="nav-title-group">
+            <h1 class="app-title">MAPA DE LÁMPARAS LED</h1>
+          </div>
+          <div class="nav-actions">
+            <a href="nueva-lampara.html" class="btn btn-secondary btn-nav-link">NUEVA INSTALACIÓN</a>
+            <a href="lamparas-instaladas.html" class="btn btn-primary btn-nav-link">VER LISTADO</a>
+          </div>
+        </header>
+
+        <section class="records-container-card">
+          <div class="records-toolbar">
+            <div class="records-toolbar-left">
+              <div class="records-search-wrapper">
+                <input type="text" id="searchInput" name="filtro-mapa-lamparas" autocomplete="off" autocorrect="off"
+                  autocapitalize="off" spellcheck="false" class="field-input" role="searchbox"
+                  placeholder="Buscar folio, ubicación o tipo">
+              </div>
+            </div>
+            <div class="records-stats-summary">
+              <div class="stat-pill">EN MAPA: <strong id="lblEnMapa">0</strong></div>
+              <div class="stat-pill">SIN COORDENADAS: <strong id="lblSinCoords">0</strong></div>
+            </div>
+          </div>
+
+          <div class="mapa-lamparas-layout">
+            <aside class="mapa-lamparas-lista" id="listaLamparas" aria-label="Lámparas en el mapa"></aside>
+            <div id="mapaLamparas" class="mapa-lamparas-canvas" role="application" aria-label="Mapa de lámparas LED instaladas"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>

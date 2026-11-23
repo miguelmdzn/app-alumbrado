@@ -13,6 +13,7 @@ const PAGINA_ACTIVA = {
   'lamparas-instaladas.html': 'navSidebarLamparas',
   'nueva-lampara.html': 'navSidebarLamparas',
   'herramientas.html': 'navSidebarHerramientas',
+  'mapa-lamparas.html': 'navSidebarHerramientas',
   'dias-inhabiles.html': 'navSidebarHerramientas',
   'justificantes.html': 'navSidebarHerramientas',
   'control-combustibles.html': 'navSidebarHerramientas',

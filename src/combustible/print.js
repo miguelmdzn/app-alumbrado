@@ -154,16 +154,16 @@ function hojaBitacora(vehiculo, filas, elaboro) {
 
 export function htmlBitacoras(filas, elaboro) {
   const nombre = String(elaboro || '').trim() || 'Miguel Angel Méndez Núñez';
+  // Primero el último día. Así la primera hoja es la del día más reciente
+  // y, dentro de cada vehículo, las filas siguen hacia el día más antiguo.
+  const ordenadas = [...filas].sort(compararCargaReciente);
   const grupos = new Map();
-  filas.forEach((row) => {
+  ordenadas.forEach((row) => {
     const clave = row.vehiculo_id || row.numero_serie;
     if (!grupos.has(clave)) grupos.set(clave, []);
     grupos.get(clave).push(row);
   });
-  return [...grupos.values()].map((rows) => {
-    const ordenadas = [...rows].sort(compararCargaReciente);
-    return hojaBitacora(ordenadas[0], ordenadas, nombre);
-  }).join('');
+  return [...grupos.values()].map((rows) => hojaBitacora(rows[0], rows, nombre)).join('');
 }
 
 function filasAjuste(items) {

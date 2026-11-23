@@ -236,30 +236,31 @@ function openDetalle(id) {
   const fotoHtml = (f1, f2) => {
     if (!f1 && !f2) return '';
     return `
-      <div class="detail-item" style="grid-column: span 2;">
-        <span class="detail-label">Fotografías adjuntas:</span>
-        <div style="display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
-          ${f1 ? `<div style="flex: 1; min-width: 200px;"><img src="${f1}" style="width: 100%; max-height: 260px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-line);" alt="Foto 1"></div>` : ''}
-          ${f2 ? `<div style="flex: 1; min-width: 200px;"><img src="${f2}" style="width: 100%; max-height: 260px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-line);" alt="Foto 2"></div>` : ''}
+      <div class="detail-item detail-item-full">
+        <span class="detail-label">Fotografías adjuntas</span>
+        <div class="lampara-detalle-fotos">
+          ${f1 ? `<img src="${f1}" alt="Fotografía 1 de la instalación">` : ''}
+          ${f2 ? `<img src="${f2}" alt="Fotografía 2 de la instalación">` : ''}
         </div>
       </div>
     `;
   };
 
+  const title = $('modalDetalleLamparaTitle');
+  if (title) title.textContent = `Detalle de instalación · ${r.folio || 'S/F'}`;
+
   content.innerHTML = `
-    <div class="detail-grid">
-      <div class="detail-item"><span class="detail-label">Folio:</span><span class="detail-value"><strong>${esc(r.folio || 'S/F')}</strong></span></div>
-      <div class="detail-item"><span class="detail-label">Fecha y Hora:</span><span class="detail-value">${esc(fd(r.fecha) || '—')} ${r.hora ? `· ${esc(r.hora)} hrs` : ''}</span></div>
-      <div class="detail-item"><span class="detail-label">Tipo de lámpara:</span><span class="detail-value"><span class="badge-tipo">${esc(r.tipo_lampara || 'LED')}</span></span></div>
-      <div class="detail-item"><span class="detail-label">Altitud:</span><span class="detail-value">${esc(r.altitud || '—')}</span></div>
-      <div class="detail-item" style="grid-column: span 2;"><span class="detail-label">Ubicación / Domicilio:</span><span class="detail-value">${esc(r.ubicacion || '—')}</span></div>
-      <div class="detail-item" style="grid-column: span 2;"><span class="detail-label">Personal que la instaló:</span><span class="detail-value"><strong>${esc(personalDisplay)}</strong></span></div>
-      <div class="detail-item"><span class="detail-label">Latitud:</span><span class="detail-value">${r.latitud != null ? r.latitud : '—'}</span></div>
-      <div class="detail-item"><span class="detail-label">Longitud:</span><span class="detail-value">${r.longitud != null ? r.longitud : '—'}</span></div>
-      <div class="detail-item" style="grid-column: span 2;"><span class="detail-label">Enlace de Google Maps:</span><span class="detail-value">${mapsUrl ? `<a href="${esc(mapsUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-weight: 600; text-decoration: underline;">Abrir ubicación en Google Maps</a>` : '—'}</span></div>
-      <div class="detail-item" style="grid-column: span 2;"><span class="detail-label">Observaciones:</span><span class="detail-value">${esc(r.observaciones || '—')}</span></div>
+      <div class="detail-item"><span class="detail-label">Folio</span><span class="detail-value"><strong>${esc(r.folio || 'S/F')}</strong></span></div>
+      <div class="detail-item"><span class="detail-label">Fecha y hora</span><span class="detail-value">${esc(fd(r.fecha) || '—')} ${r.hora ? `· ${esc(r.hora)} hrs` : ''}</span></div>
+      <div class="detail-item"><span class="detail-label">Tipo de lámpara</span><span class="detail-value"><span class="badge-tipo">${esc(r.tipo_lampara || 'LED')}</span></span></div>
+      <div class="detail-item"><span class="detail-label">Altitud</span><span class="detail-value">${esc(r.altitud || '—')}</span></div>
+      <div class="detail-item detail-item-full"><span class="detail-label">Ubicación / domicilio</span><span class="detail-value">${esc(r.ubicacion || '—')}</span></div>
+      <div class="detail-item detail-item-full"><span class="detail-label">Personal que la instaló</span><span class="detail-value"><strong>${esc(personalDisplay)}</strong></span></div>
+      <div class="detail-item"><span class="detail-label">Latitud</span><span class="detail-value">${r.latitud != null ? esc(r.latitud) : '—'}</span></div>
+      <div class="detail-item"><span class="detail-label">Longitud</span><span class="detail-value">${r.longitud != null ? esc(r.longitud) : '—'}</span></div>
+      <div class="detail-item detail-item-full"><span class="detail-label">Enlace de Google Maps</span><span class="detail-value">${mapsUrl ? `<a href="${esc(mapsUrl)}" target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps</a>` : '—'}</span></div>
+      <div class="detail-item detail-item-full"><span class="detail-label">Observaciones</span><span class="detail-value">${esc(r.observaciones || '—')}</span></div>
       ${fotoHtml(r.foto1, r.foto2)}
-    </div>
   `;
 
   $('modalDetalleLampara').classList.remove('hidden');
@@ -335,7 +336,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Eliminar
   $('btnEliminarLamparaNo')?.addEventListener('click', closeDeleteConfirm);
-  $('btnEliminarLamparaNo2')?.addEventListener('click', closeDeleteConfirm);
   $('btnEliminarLamparaSi')?.addEventListener('click', confirmDelete);
   $('modalEliminarLampara')?.addEventListener('click', (e) => {
     if (e.target === $('modalEliminarLampara')) closeDeleteConfirm();

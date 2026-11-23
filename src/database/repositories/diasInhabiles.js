@@ -235,9 +235,43 @@ export async function deleteDiaInhabil(id) {
  * Además, para los días municipales activos, si no están dados de alta para el año actual,
  * los proyecta para que sigan activos como lo solicita el usuario.
  */
+/** Escribe en SQLite los feriados oficiales que todavía no existen. */
+export async function ensureOfficialHolidays(conn, years) {
+  if (!conn?.select || !conn?.execute) return 0;
+  const lista = years?.length
+    ? years
+    : [new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1];
+  let inserted = 0;
+
+  for (const y of lista) {
+    for (const h of getOfficialMexicanHolidays(y)) {
+      const found = await conn.select(
+        `SELECT id FROM ${TABLE} WHERE tipo = 'Oficial' AND fecha = $1 LIMIT 1;`,
+        [h.fecha]
+      );
+      if (found?.length) continue;
+      await conn.execute(
+        `INSERT INTO ${TABLE} (id, fecha, descripcion, tipo, year, activo)
+         VALUES ($1, $2, $3, 'Oficial', $4, 1);`,
+        [generateUUID(), h.fecha, h.descripcion, h.year]
+      );
+      inserted += 1;
+    }
+  }
+  return inserted;
+}
+
 export async function syncOfficialHolidays(targetYear = new Date().getFullYear()) {
   const currentYear = Number(targetYear);
   const yearsToSync = [currentYear - 1, currentYear, currentYear + 1];
+
+  if (isSQLiteReady()) {
+    try {
+      await ensureOfficialHolidays(getSQLite(), yearsToSync);
+    } catch (err) {
+      console.error('[dias_inhabiles] No se pudieron guardar los feriados oficiales:', err);
+    }
+  }
 
   const existing = await getAllDiasInhabiles();
   const existingMap = new Map();
@@ -245,8 +279,8 @@ export async function syncOfficialHolidays(targetYear = new Date().getFullYear()
     existingMap.set(`${h.tipo}|${h.fecha}`, h);
   });
 
-  // 1. Insertar días oficiales faltantes para cada año
-  for (const y of yearsToSync) {
+  // 1. Sin SQLite, los oficiales se guardan en el respaldo local.
+  if (!isSQLiteReady()) for (const y of yearsToSync) {
     const officialHolidays = getOfficialMexicanHolidays(y);
     for (const h of officialHolidays) {
       const key = `Oficial|${h.fecha}`;

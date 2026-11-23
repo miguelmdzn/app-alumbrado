@@ -16,6 +16,8 @@
  * ============================================================================
  */
 
+import { ensureOfficialHolidays } from './repositories/diasInhabiles.js';
+
 /**
  * Lista ordenada de migraciones.
  * Cada entrada tiene:
@@ -757,6 +759,13 @@ export async function runMigrations(conn) {
     console.info('[Migrations] Esquema actualizado correctamente.');
   } catch (err) {
     console.error('[Migrations] Error al correr migraciones:', err);
+  }
+
+  try {
+    const n = await ensureOfficialHolidays(conn);
+    if (n) console.info(`[Migrations] Feriados oficiales agregados: ${n}`);
+  } catch (err) {
+    console.error('[Migrations] No se pudieron cargar los feriados oficiales:', err);
   }
 }
 

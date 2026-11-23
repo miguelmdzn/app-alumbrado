@@ -250,6 +250,7 @@ async function cargarDias({ reset = false } = {}) {
     renderTable(page.rows, { paged: true, total: page.total });
   } catch (err) {
     console.error('Error al consultar días inhábiles:', err);
+    renderTable([], { paged: true, total: 0 });
   }
 }
 
@@ -261,7 +262,7 @@ function updateYearFilterOptions() {
   const select = $('filterYear');
   if (!select) return;
 
-  const currentVal = select.value;
+  const currentVal = select.value || 'todos';
   const currentYear = new Date().getFullYear();
   const yearsSet = new Set([currentYear - 1, currentYear, currentYear + 1]);
 
@@ -271,7 +272,7 @@ function updateYearFilterOptions() {
 
   let html = '<option value="todos">Todos los años</option>';
   sortedYears.forEach((y) => {
-    const isSelected = String(y) === String(currentYear) && currentVal === 'todos';
+    const isSelected = String(y) === String(currentVal);
     html += `<option value="${y}" ${isSelected ? 'selected' : ''}>${y}</option>`;
   });
 

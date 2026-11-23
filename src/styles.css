@@ -530,8 +530,10 @@ body.is-admin .admin-only-delete {
   padding: 24px 24px 48px;
 }
 
-.app-container-fluid {
+.app-container-fluid,
+.app-container:has(.records-table) {
   max-width: none;
+  padding: 22px 28px 36px;
 }
 
 /* --------------------------------------------------------------------------
@@ -1451,6 +1453,10 @@ body.is-admin .admin-only-delete {
   margin-bottom: 24px;
 }
 
+.records-container-card:has(.records-table) {
+  padding: 16px 16px 8px;
+}
+
 .records-toolbar {
   display: flex;
   justify-content: space-between;
@@ -1551,7 +1557,8 @@ body.is-admin .admin-only-delete {
 
 .records-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 12.5px;
   text-align: left;
   background: #FFFFFF;
@@ -1563,20 +1570,22 @@ body.is-admin .admin-only-delete {
 }
 
 .records-table th {
-  padding: 12px 14px;
-  font-size: 11px;
+  padding: 9px 14px;
+  font-size: 12px;
   font-weight: 700;
-  color: var(--primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: #3d4c60;
+  text-transform: none;
+  letter-spacing: 0;
   white-space: nowrap;
+  border-bottom: 2px solid #e8e0d2;
 }
 
 .records-table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #E2E8F0;
-  color: var(--text-main);
+  border-bottom: 1px solid #f0ebe2;
+  color: #243041;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .records-table tbody tr:hover {
@@ -1608,6 +1617,8 @@ body.is-admin .admin-only-delete {
 .td-domicilio {
   max-width: 260px;
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Reportes tiene muchas columnas: una sola línea por fila para mostrar
@@ -1752,6 +1763,11 @@ body.is-admin .admin-only-delete {
   align-items: center;
   justify-content: center;
   gap: 6px;
+}
+
+.records-table .btn-icon-action {
+  width: 30px;
+  height: 30px;
 }
 
 .btn-icon-action {
@@ -2479,7 +2495,8 @@ body.is-admin .admin-only-delete {
    Responsive (Ajustes para ventana pequeña / móvil)
    -------------------------------------------------------------------------- */
 @media (max-width: 820px) {
-  .app-container {
+  .app-container,
+  .app-container:has(.records-table) {
     padding: 12px 10px;
   }
 
@@ -3484,20 +3501,44 @@ button.sidebar-submenu-item {
   }
 
   .app-main-content {
+    position: relative;
+    isolation: isolate;
     animation: none;
     background:
-      linear-gradient(to bottom,
-        rgba(239, 234, 225, 0.15) 0%,
-        rgba(239, 234, 225, 0.55) 180px,
-        rgba(239, 234, 225, 0.96) 340px,
-        #efeae1 100%),
-      linear-gradient(to right,
-        rgba(239, 234, 225, 0.92) 0%,
-        rgba(239, 234, 225, 0.70) 45%,
-        rgba(239, 234, 225, 0.10) 100%),
-      url('bg-alumbrado.jpg') top right / auto 420px no-repeat,
       radial-gradient(980px 420px at 8% -8%, rgba(176, 146, 98, 0.16), transparent 62%),
       linear-gradient(180deg, #efeae1 0%, #e4dfd4 100%);
+  }
+
+  /* La foto del encabezado se funde con el papel: en pantallas anchas
+     no se ve el rectángulo de la imagen. */
+  .app-main-content::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 560px;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      linear-gradient(to right,
+        rgba(239, 234, 225, 0.72) 0%,
+        rgba(239, 234, 225, 0.34) 36%,
+        rgba(239, 234, 225, 0.08) 68%),
+      url('bg-alumbrado.jpg') right 38% / cover no-repeat;
+    -webkit-mask-image:
+      linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.35) 14%, #000 42%, #000 100%),
+      linear-gradient(to bottom, #000 0%, #000 16%, rgba(0, 0, 0, 0.4) 52%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.35) 14%, #000 42%, #000 100%),
+      linear-gradient(to bottom, #000 0%, #000 16%, rgba(0, 0, 0, 0.4) 52%, transparent 100%);
+    mask-composite: intersect;
+  }
+
+  .app-main-content > * {
+    position: relative;
+    z-index: 1;
   }
 
   .app-container {
@@ -3873,17 +3914,8 @@ button.sidebar-submenu-item {
   body.vista-reportes-dash .app-main-content {
     animation: none;
     position: relative;
+    isolation: isolate;
     background:
-      linear-gradient(to bottom,
-        rgba(239, 234, 225, 0.15) 0%,
-        rgba(239, 234, 225, 0.55) 180px,
-        rgba(239, 234, 225, 0.96) 340px,
-        #efeae1 100%),
-      linear-gradient(to right,
-        rgba(239, 234, 225, 0.92) 0%,
-        rgba(239, 234, 225, 0.70) 45%,
-        rgba(239, 234, 225, 0.10) 100%),
-      url('bg-alumbrado.jpg') top right / auto 420px no-repeat,
       radial-gradient(980px 420px at 8% -8%, rgba(176, 146, 98, 0.16), transparent 62%),
       linear-gradient(180deg, #efeae1 0%, #e4dfd4 100%);
   }
@@ -4331,14 +4363,8 @@ button.sidebar-submenu-item {
 
 @media screen and (max-width: 1100px) {
   body.vista-reportes-dash .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  body.vista-reportes-dash .app-main-content {
-    background:
-      linear-gradient(to bottom,
-        rgba(239, 234, 225, 0.2) 0%,
-        rgba(239, 234, 225, 0.96) 240px,
-        #efeae1 100%),
-      url('bg-alumbrado.jpg') top right / auto 300px no-repeat,
-      linear-gradient(180deg, #efeae1 0%, #e4dfd4 100%);
+  .app-main-content::before {
+    height: 400px;
   }
 }
 
@@ -4365,6 +4391,7 @@ button.sidebar-submenu-item {
 
 @media print {
   #entradaDia { display: none !important; }
+  .app-main-content::before { display: none !important; }
 }
 
 #entradaDia {
@@ -4458,7 +4485,9 @@ a.learn-more .circle .icon {
   background: #fff;
 }
 a.learn-more .circle .icon.arrow {
-  left: 0.625rem;
+  /* El círculo mide 3rem. La punta visible queda a la izquierda de su caja,
+     así que se corre para que el centro óptico caiga en el medio. */
+  left: calc(1.5rem - 1.82px);
   width: 1.125rem;
   height: 0.125rem;
   background: none;
@@ -4501,4 +4530,132 @@ a.learn-more:hover .button-text { color: #f7f3ea; }
   .sidebar-menu-item.active { animation: none; }
   ::view-transition-old(app-sidebar),
   ::view-transition-new(app-sidebar) { animation-duration: 0s; }
+}
+
+.lampara-detalle-fotos {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.lampara-detalle-fotos img {
+  flex: 1;
+  min-width: 180px;
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border-line);
+}
+
+.detail-value a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.mapa-lamparas-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  min-height: calc(100vh - 210px);
+  border-top: 1px solid var(--border-line);
+}
+
+.mapa-lamparas-lista {
+  border-right: 1px solid var(--border-line);
+  overflow-y: auto;
+  max-height: calc(100vh - 210px);
+  background: #F8FAFC;
+}
+
+.mapa-lamparas-item {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--border-line);
+  background: transparent;
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mapa-lamparas-item:hover,
+.mapa-lamparas-item.is-active {
+  background: #E0F2FE;
+}
+
+.mapa-lamparas-item strong {
+  color: #173867;
+  font-size: 13px;
+}
+
+.mapa-lamparas-item span {
+  color: #64748B;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.mapa-lamparas-canvas {
+  min-height: 520px;
+  height: calc(100vh - 210px);
+  background: #E2E8F0;
+}
+
+.mapa-lamparas-vacio {
+  padding: 28px 16px;
+  color: #64748B;
+  font-size: 13px;
+  text-align: center;
+}
+
+.mapa-pin {
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: #F59E0B;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #173867, 0 2px 6px rgba(15, 23, 42, 0.35);
+}
+
+.mapa-popup .leaflet-popup-content-wrapper {
+  border-radius: 10px;
+}
+
+.mapa-popup .leaflet-popup-content {
+  margin: 10px 12px;
+  min-width: 180px;
+}
+
+.mapa-popup-folio {
+  margin: 0 0 4px;
+  color: #173867;
+  font-size: 14px;
+}
+
+.mapa-popup p {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  color: #334155;
+}
+
+@media (max-width: 860px) {
+  .mapa-lamparas-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .mapa-lamparas-lista {
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-line);
+  }
+
+  .mapa-lamparas-canvas {
+    height: 62vh;
+    min-height: 360px;
+  }
 }
