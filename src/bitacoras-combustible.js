@@ -312,9 +312,10 @@ $('formPdfBitacora').addEventListener('submit', async (event) => {
     return;
   }
   const elaboro = $('pdfElaboro')?.value.trim() || ELABORO_DEFAULT;
+  const orden = $('pdfOrden')?.value === 'asc' ? 'asc' : 'desc';
   $('modalPdfBitacora').classList.add('hidden');
   showToast('success', 'Generando el documento...');
-  imprimirDocumento('Bitácora de gasolina', htmlBitacoras(seleccion, elaboro)).catch((err) => {
+  imprimirDocumento('Bitácora de gasolina', htmlBitacoras(seleccion, elaboro, orden)).catch((err) => {
     showToast('error', mensajeError(err));
   });
 });

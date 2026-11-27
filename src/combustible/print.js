@@ -152,11 +152,14 @@ function hojaBitacora(vehiculo, filas, elaboro) {
   </section>`;
 }
 
-export function htmlBitacoras(filas, elaboro) {
+export function htmlBitacoras(filas, elaboro, orden = 'desc') {
   const nombre = String(elaboro || '').trim() || 'Miguel Angel Méndez Núñez';
-  // Primero el último día. Así la primera hoja es la del día más reciente
-  // y, dentro de cada vehículo, las filas siguen hacia el día más antiguo.
-  const ordenadas = [...filas].sort(compararCargaReciente);
+  // "asc": de la fecha más antigua a la más reciente.
+  // "desc": de la fecha más reciente a la más antigua.
+  const comparar = orden === 'asc'
+    ? (a, b) => compararCargaReciente(b, a)
+    : compararCargaReciente;
+  const ordenadas = [...filas].sort(comparar);
   const grupos = new Map();
   ordenadas.forEach((row) => {
     const clave = row.vehiculo_id || row.numero_serie;
